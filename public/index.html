@@ -16,18 +16,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Ar
 .header-bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:20px;font-size:12px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px}
 .orb-container{display:flex;justify-content:center;align-items:center;height:200px;margin-bottom:20px}
 .orb{width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,var(--accent-blue) 0%,transparent 70%);box-shadow:0 0 50px rgba(59,130,246,.3);animation:pulse 2s infinite ease-in-out}
-@keyframes pulse{0%{transform:scale(.95);opacity:.8}50%{transform:scale(1.05);opacity:1}100%{transform:scale(.95);opacity:.8}}
+@keyframes pulse{0%,100%{transform:scale(.95);opacity:.8}50%{transform:scale(1.05);opacity:1}}
 @media (prefers-reduced-motion:reduce){.orb{animation:none}}
-.btn-primary{width:100%;padding:12px;background:var(--accent-blue);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background-color .2s}
+.btn-primary{width:100%;padding:12px;background:var(--accent-blue);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
 .btn-primary:hover{background:#2563eb}
 .btn-primary:disabled{opacity:.6;cursor:wait}
 .log-box{background:#000;border:1px solid var(--border-color);border-radius:8px;padding:15px;font-family:monospace;font-size:12px;color:#a7f3d0;height:140px;overflow-y:auto;margin-top:15px;line-height:1.5}
 .input-group{margin-bottom:15px}
 label{display:block;font-size:12px;color:var(--text-secondary);margin-bottom:5px}
-input,select{width:100%;padding:10px;background:#000;border:1px solid var(--border-color);color:#fff;border-radius:6px;font-size:14px;text-overflow:ellipsis}
-input:focus-visible,select:focus-visible,.btn-primary:focus-visible{outline:2px solid var(--accent-blue);outline-offset:2px}
+input,select,textarea{width:100%;padding:10px;background:#000;border:1px solid var(--border-color);color:#fff;border-radius:6px;font-size:14px;font-family:inherit}
+input:focus-visible,select:focus-visible,textarea:focus-visible,.btn-primary:focus-visible{outline:2px solid var(--accent-blue);outline-offset:2px}
 .row{display:flex;gap:10px}
 .row .input-group{flex:1;min-width:0}
+.chip{font-size:12px;color:var(--text-secondary);border:1px dashed var(--border-color);border-radius:8px;padding:10px}
 .resume-canvas{background:#fff;color:#000;flex-grow:1;min-height:0;border-radius:8px;padding:40px;overflow-y:auto}
 .resume-header{text-align:center;margin-bottom:30px}
 .resume-name{font-size:24px;font-weight:bold;margin:0}
@@ -38,7 +39,10 @@ input:focus-visible,select:focus-visible,.btn-primary:focus-visible{outline:2px 
 .experience-header{display:flex;justify-content:space-between;gap:10px;font-weight:bold;font-size:14px}
 .experience-sub{font-size:12px;color:#4b5563;margin-bottom:5px}
 .resume-canvas ul{margin:0;padding-left:20px;font-size:13px;line-height:1.5}
-#resume-summary{font-size:13px;line-height:1.5}
+#r-summary,#r-skills,#r-edu{font-size:13px;line-height:1.5;white-space:pre-line;margin:0}
+.ph,.ph *{color:#9ca3af!important;font-style:italic}
+.flash{animation:flash 1.2s ease-out}
+@keyframes flash{from{background:#dbeafe}to{background:transparent}}
 @media (max-width:800px){
   body{flex-direction:column;height:auto;overflow:auto;padding:12px}
   .left-column,.right-column{width:100%;overflow:visible;padding-right:0}
@@ -54,91 +58,118 @@ input:focus-visible,select:focus-visible,.btn-primary:focus-visible{outline:2px 
 <div class="left-column">
   <div class="panel">
     <div class="header-bar"><span id="status">● SESSION STANDBY</span><span>Career Copilot. AI</span></div>
-    <div class="orb-container"><div class="orb" id="voice-orb"></div></div>
+    <div class="orb-container"><div class="orb"></div></div>
     <button class="btn-primary" id="start-interview-btn" onclick="startInterview()">Start Voice Interview</button>
     <div class="log-box" id="interview-log" aria-live="polite">System initialized. Ready to begin.</div>
   </div>
 
   <div class="panel">
+    <div class="header-bar"><span>Documents</span></div>
+    <div class="input-group"><label for="resumeFile">Upload a current resume (PDF, PNG, JPG, or text)</label><input type="file" id="resumeFile" accept=".pdf,.txt,image/png,image/jpeg"></div>
+    <div class="input-group"><label for="jobFile">Upload a job description (PDF, PNG, JPG, or text)</label><input type="file" id="jobFile" accept=".pdf,.txt,image/png,image/jpeg"></div>
+    <div class="input-group"><label for="jobText">Or paste a job description</label><textarea id="jobText" rows="4"></textarea><button class="btn-primary" id="jobBtn" style="margin-top:8px">Use pasted job description</button></div>
+    <div class="chip" id="jobChip">No job description yet.</div>
+  </div>
+
+  <div class="panel">
     <div class="header-bar"><span>⚙ AUTONOMOUS APPLICATION RULES</span></div>
-    <div class="input-group">
-      <label for="targetRoles">Target Roles (Comma-separated)</label>
-      <input type="text" id="targetRoles" value="Transit Systems Analyst, Business Systems Analyst, Operations Supervisor">
-    </div>
+    <div class="input-group"><label for="targetRoles">Target Roles (Comma-separated)</label><input type="text" id="targetRoles" value="Transit Systems Analyst, Business Systems Analyst, Operations Supervisor"></div>
     <div class="row">
-      <div class="input-group">
-        <label for="minSalary">Min Base Salary</label>
-        <input type="text" id="minSalary" value="$90,000 / yr">
-      </div>
-      <div class="input-group">
-        <label for="workArrangement">Work Arrangement</label>
-        <select id="workArrangement">
-          <option value="remote">Remote</option>
-          <option value="onsite">On-site</option>
-          <option value="hybrid" selected>Hybrid</option>
-        </select>
-      </div>
+      <div class="input-group"><label for="minSalary">Min Base Salary</label><input type="text" id="minSalary" value="$90,000 / yr"></div>
+      <div class="input-group"><label for="workArrangement">Work Arrangement</label><select id="workArrangement"><option value="remote">Remote</option><option value="onsite">On-site</option><option value="hybrid" selected>Hybrid</option></select></div>
     </div>
-    <div class="input-group">
-      <label for="scheduleAvailability">Schedule Availability</label>
-      <input type="text" id="scheduleAvailability" value="1:30 AM to 3:00 PM">
-    </div>
-    <div class="input-group">
-      <label for="jobUrl">Test Hybrid Dispatcher (Paste Job Posting URL)</label>
-      <input type="text" id="jobUrl" value="https://boards.greenhouse.io/...">
-    </div>
+    <div class="input-group"><label for="scheduleAvailability">Schedule Availability</label><input type="text" id="scheduleAvailability" value="1:30 AM to 3:00 PM"></div>
+    <div class="input-group"><label for="jobUrl">Test Hybrid Dispatcher (Paste Job Posting URL)</label><input type="text" id="jobUrl" value="https://boards.greenhouse.io/..."></div>
   </div>
 </div>
 
 <div class="right-column">
-  <div class="header-bar"><span>● LIVE RESUME CANVAS</span><span>Updated autonomously via Claude</span></div>
+  <div class="header-bar"><span>● LIVE RESUME CANVAS</span><span>Updated as you talk</span></div>
   <div class="resume-canvas" id="resume-content">
     <div class="resume-header">
-      <h1 class="resume-name">AMMIYHUD ISRAEL</h1>
-      <div class="resume-title">TRANSIT SYSTEMS ANALYST &amp; OPERATIONS SPECIALIST</div>
-      <div class="resume-contact">Sterling Heights, MI • dispatch-systems@domain.com • Class A CDL (Passenger Endorsement)</div>
+      <h1 class="resume-name" id="r-name"></h1>
+      <div class="resume-title" id="r-title"></div>
+      <div class="resume-contact" id="r-contact"></div>
     </div>
-
-    <div class="section-title">PROFESSIONAL SUMMARY</div>
-    <p id="resume-summary">Results-driven Operations Dispatcher and Paratransit Systems Supervisor with extensive experience directing large-scale fixed-route scheduling, compliance, and real-time transit logistics. Proven expertise in driver management, regulatory ADA adherence, route optimization, and technical troubleshooting across enterprise transit management platforms.</p>
-
-    <div class="section-title">PROFESSIONAL EXPERIENCE</div>
-    <div class="experience-item">
-      <div class="experience-header"><span>Paratransit Dispatcher &amp; Operations Supervisor</span><span>2024 - Present</span></div>
-      <div class="experience-sub">Suburban Mobility Authority for Regional Transportation (SMART) | Troy, MI</div>
-      <ul id="resume-bullets">
-        <li>Orchestrate daily dispatch operations, route tracking, and manifest assignments for fleet operators across Macomb County.</li>
-        <li>Maintain 98%+ on-time transit performance through dynamic schedule adjustment and real-time detour routing.</li>
-        <li>Enforce state and federal regulatory compliance, operator log audits, and passenger safety protocols.</li>
-      </ul>
-    </div>
+    <div class="section-title">PROFESSIONAL SUMMARY</div><p id="r-summary"></p>
+    <div class="section-title">PROFESSIONAL EXPERIENCE</div><div id="r-exp"></div>
+    <div class="section-title">SKILLS</div><p id="r-skills"></p>
+    <div class="section-title">EDUCATION</div><p id="r-edu"></p>
   </div>
 </div>
 
 <script>
-// Update this if Google retires the model. Check Google's current Live API docs.
 const GEMINI_MODEL = "models/gemini-3.8-live";
-const INTERVIEWER_PROMPT = "You are a friendly resume interviewer. Speak in short, natural sentences. Ask about one job at a time: title, employer, dates, daily duties, tools used, and measurable results. Ask one question, then wait for the answer. Ask a follow-up for numbers (team size, percentages, dollar amounts) when the person gives vague answers.";
+const INTERVIEWER_PROMPT = "You are a friendly resume interviewer. Speak in short, natural sentences and ask ONE question at a time. Start by asking the candidate's name and the job they want. Then go through each past job: title, employer, location, dates, daily duties, tools, and measurable results (ask for numbers when answers are vague). Then ask about skills and education. After EVERY answer, call update_resume with the new facts. Include only facts the candidate actually said or that appear in the provided documents. Never invent employers, dates, or numbers. If you are given existing resume data or a job description, do not re-ask what is already known; use the job description to decide which questions matter most.";
+const TOOLS = [{ functionDeclarations: [{
+  name: "update_resume",
+  description: "Save resume details the candidate just shared. Call after every answer. Only include facts the candidate stated.",
+  parameters: { type: "OBJECT", properties: {
+    name: { type: "STRING" }, title: { type: "STRING", description: "Target job title" },
+    contact: { type: "STRING", description: "City, state, email, phone" }, summary: { type: "STRING" },
+    job: { type: "OBJECT", properties: { role: { type: "STRING" }, company: { type: "STRING" }, location: { type: "STRING" }, dates: { type: "STRING" }, bullets: { type: "ARRAY", items: { type: "STRING" } } } },
+    skills: { type: "ARRAY", items: { type: "STRING" } }, education: { type: "ARRAY", items: { type: "STRING" } }
+  } }
+}] }];
 
+const $ = id => document.getElementById(id);
+let R = { name: "", title: "", contact: "", summary: "", experience: [], skills: [], education: [] };
+let JOB = null;
 let websocket, audioContext, mediaStream, processor;
-let isSetupComplete = false;
-let nextPlayTime = 0;
-let polishing = false;
+let isSetupComplete = false, nextPlayTime = 0, polishing = false;
+
+function put(el, val, ph) { el.textContent = val || ph; el.classList.toggle('ph', !val); }
+function render() {
+  put($('r-name'), R.name, 'Jane Doe');
+  put($('r-title'), R.title, 'Target Job Title');
+  put($('r-contact'), R.contact, 'City, ST • email@example.com • (555) 555-5555');
+  put($('r-summary'), R.summary, 'Your professional summary will appear here as you talk with the assistant.');
+  put($('r-skills'), R.skills.join(' • '), 'Your skills will appear here.');
+  put($('r-edu'), R.education.join('\n'), 'Your education will appear here.');
+  const ex = $('r-exp'); ex.replaceChildren();
+  const jobs = R.experience.length ? R.experience : [{ role: 'Job Title', company: 'Company', location: 'City, ST', dates: 'Year - Year', bullets: ['Your accomplishments will appear here.'], ph: true }];
+  for (const j of jobs) {
+    const d = document.createElement('div'); d.className = 'experience-item' + (j.ph ? ' ph' : '');
+    const h = document.createElement('div'); h.className = 'experience-header';
+    for (const t of [j.role, j.dates]) { const s = document.createElement('span'); s.textContent = t || ''; h.append(s); }
+    const sub = document.createElement('div'); sub.className = 'experience-sub';
+    sub.textContent = [j.company, j.location].filter(Boolean).join(' | ');
+    const ul = document.createElement('ul');
+    for (const b of j.bullets || []) { const li = document.createElement('li'); li.textContent = b; ul.append(li); }
+    d.append(h, sub, ul); ex.append(d);
+  }
+  const c = $('resume-content'); c.classList.remove('flash'); void c.offsetWidth; c.classList.add('flash');
+}
+
+function applyUpdate(a) {
+  for (const k of ['name', 'title', 'contact', 'summary']) if (typeof a[k] === 'string' && a[k].trim()) R[k] = a[k].trim();
+  const j = a.job;
+  if (j && (j.role || j.company)) {
+    const same = (x, y) => (x || '').toLowerCase() === (y || '').toLowerCase();
+    const i = R.experience.findIndex(x => same(x.company, j.company) && same(x.role, j.role));
+    if (i < 0) R.experience.push({ bullets: [], ...j });
+    else {
+      const o = R.experience[i];
+      for (const [k, v] of Object.entries(j)) if (v && k !== 'bullets') o[k] = v;
+      o.bullets = [...new Set([...(o.bullets || []), ...(j.bullets || [])])];
+    }
+  }
+  for (const k of ['skills', 'education']) if (Array.isArray(a[k])) R[k] = [...new Set([...R[k], ...a[k]])];
+  render();
+}
 
 function logMessage(msg) {
-  const box = document.getElementById('interview-log');
+  const box = $('interview-log');
   box.appendChild(document.createElement('br'));
   box.appendChild(document.createTextNode('> ' + msg));
   box.scrollTop = box.scrollHeight;
 }
-
 function setUi(active) {
-  const btn = document.getElementById('start-interview-btn');
+  const btn = $('start-interview-btn');
   btn.innerText = active ? "End Interview & Polish Resume" : "Start Voice Interview";
   btn.style.backgroundColor = active ? "#ef4444" : "";
-  document.getElementById('status').textContent = active ? "● SESSION LIVE" : "● SESSION STANDBY";
+  $('status').textContent = active ? "● SESSION LIVE" : "● SESSION STANDBY";
 }
-
 function stopSession() {
   isSetupComplete = false;
   if (processor) { processor.disconnect(); processor.onaudioprocess = null; processor = null; }
@@ -146,31 +177,63 @@ function stopSession() {
   if (audioContext && audioContext.state !== 'closed') audioContext.close().catch(console.error);
   setUi(false);
 }
+function tell(text) {
+  if (websocket && websocket.readyState === WebSocket.OPEN && isSetupComplete)
+    websocket.send(JSON.stringify({ realtimeInput: { text } }));
+}
 
+// ---------- Documents ----------
+const b64 = file => new Promise(res => { const f = new FileReader(); f.onload = () => res(f.result.split(',')[1]); f.readAsDataURL(file); });
+async function addDoc(kind, file, text) {
+  const label = kind === 'job' ? 'job description' : 'resume';
+  try {
+    logMessage(`Reading ${label}...`);
+    const body = { kind };
+    if (text) body.text = text;
+    else if (file.size > 4e6) return logMessage('That file is over 4 MB. Try a smaller one.');
+    else if (file.type === 'text/plain') body.text = await file.text();
+    else { body.mime = file.type; body.data = await b64(file); }
+    const r = await fetch('/api/extract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json();
+    if (!r.ok || !j.data) throw new Error(j.error || 'HTTP ' + r.status);
+    const d = j.data;
+    if (kind === 'job') {
+      JOB = d;
+      $('jobChip').textContent = `Target job: ${[d.role, d.company].filter(Boolean).join(' at ') || 'added'}`;
+      if (!R.title && d.role) applyUpdate({ title: d.role });
+      tell('The candidate added a job description: ' + JSON.stringify(d) + ' Use it to focus your questions.');
+    } else {
+      for (const job of d.experience || []) applyUpdate({ job });
+      applyUpdate({ name: d.name, title: d.title, contact: d.contact, summary: d.summary, skills: d.skills, education: d.education });
+      tell('The candidate uploaded a resume. Resume data so far: ' + JSON.stringify(R) + ' Do not re-ask what is already filled in.');
+    }
+    logMessage(`Added your ${label}.`);
+  } catch (err) { logMessage(`Could not read ${label}: ${err.message}`); }
+}
+$('resumeFile').onchange = e => e.target.files[0] && addDoc('resume', e.target.files[0]);
+$('jobFile').onchange = e => e.target.files[0] && addDoc('job', e.target.files[0]);
+$('jobBtn').onclick = () => { const t = $('jobText').value.trim(); if (t) addDoc('job', null, t); };
+
+// ---------- Voice ----------
 function playAudioChunk(base64Audio) {
   try {
     if (!audioContext || audioContext.state === 'closed') return;
-    const bin = atob(base64Audio);
-    const bytes = new Uint8Array(bin.length);
+    const bin = atob(base64Audio), bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    const int16 = new Int16Array(bytes.buffer);
-    const f32 = new Float32Array(int16.length);
+    const int16 = new Int16Array(bytes.buffer), f32 = new Float32Array(int16.length);
     for (let i = 0; i < int16.length; i++) f32[i] = int16[i] / 32768;
     const buf = audioContext.createBuffer(1, f32.length, 24000);
     buf.getChannelData(0).set(f32);
     const src = audioContext.createBufferSource();
-    src.buffer = buf;
-    src.connect(audioContext.destination);
+    src.buffer = buf; src.connect(audioContext.destination);
     const now = audioContext.currentTime;
     if (nextPlayTime < now) nextPlayTime = now;
-    src.start(nextPlayTime);
-    nextPlayTime += buf.duration;
+    src.start(nextPlayTime); nextPlayTime += buf.duration;
   } catch (e) { console.error("Audio playback error:", e); }
 }
 
 async function startInterview() {
   if (polishing) return;
-
   if (websocket && websocket.readyState === WebSocket.OPEN) {
     websocket.close(1000, "done");
     stopSession();
@@ -178,111 +241,71 @@ async function startInterview() {
     await polishResume();
     return;
   }
-
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
     const source = audioContext.createMediaStreamSource(mediaStream);
     processor = audioContext.createScriptProcessor(4096, 1, 1);
-    source.connect(processor);
-    processor.connect(audioContext.destination);
+    source.connect(processor); processor.connect(audioContext.destination);
 
-    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    websocket = new WebSocket(`${proto}//${location.host}/api/voice`);
-
+    websocket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/api/voice`);
     websocket.onopen = () => {
-      isSetupComplete = false;
-      nextPlayTime = 0;
+      isSetupComplete = false; nextPlayTime = 0;
       logMessage("Connected to server. Starting session...");
       setUi(true);
-      websocket.send(JSON.stringify({
-        setup: {
-          model: GEMINI_MODEL,
-          generationConfig: { responseModalities: ["AUDIO"] },
-          systemInstruction: { parts: [{ text: INTERVIEWER_PROMPT }] }
-        }
-      }));
+      websocket.send(JSON.stringify({ setup: {
+        model: GEMINI_MODEL,
+        generationConfig: { responseModalities: ["AUDIO"] },
+        systemInstruction: { parts: [{ text: INTERVIEWER_PROMPT }] },
+        tools: TOOLS
+      } }));
     };
-
-    websocket.onclose = (e) => {
-      logMessage(`Session closed (code ${e.code}${e.reason ? ': ' + e.reason : ''}).`);
-      stopSession();
-    };
-
-    websocket.onmessage = async (event) => {
+    websocket.onclose = e => { logMessage(`Session closed (code ${e.code}${e.reason ? ': ' + e.reason : ''}).`); stopSession(); };
+    websocket.onmessage = async event => {
       try {
-        const raw = typeof event.data === 'string' ? event.data : await event.data.text();
-        const res = JSON.parse(raw);
+        const res = JSON.parse(typeof event.data === 'string' ? event.data : await event.data.text());
         if (res.setupComplete) {
           isSetupComplete = true;
           logMessage("Voice AI ready. Say hello!");
-        } else if (res.serverContent && res.serverContent.modelTurn) {
-          for (const part of res.serverContent.modelTurn.parts || []) {
-            if (part.inlineData && part.inlineData.data) playAudioChunk(part.inlineData.data);
-          }
-        } else if (res.error) {
-          logMessage("Voice AI error: " + (res.error.message || JSON.stringify(res.error)));
+          tell('Resume data so far: ' + JSON.stringify(R) + ' Target job: ' + JSON.stringify(JOB) + ' Greet the candidate and ask only for what is missing.');
         }
-      } catch (err) {
-        logMessage("Could not read a server message: " + err.message);
-      }
+        if (res.toolCall) {
+          const out = (res.toolCall.functionCalls || []).map(fc => {
+            if (fc.name === 'update_resume') applyUpdate(fc.args || {});
+            return { id: fc.id, name: fc.name, response: { result: 'saved' } };
+          });
+          websocket.send(JSON.stringify({ toolResponse: { functionResponses: out } }));
+        }
+        if (res.serverContent && res.serverContent.modelTurn)
+          for (const p of res.serverContent.modelTurn.parts || []) if (p.inlineData && p.inlineData.data) playAudioChunk(p.inlineData.data);
+        if (res.error) logMessage("Voice AI error: " + (res.error.message || JSON.stringify(res.error)));
+      } catch (err) { logMessage("Could not read a server message: " + err.message); }
     };
-
     websocket.onerror = () => logMessage("Connection error. Check that /api/voice is deployed and GEMINI_API_KEY is set.");
-
-    processor.onaudioprocess = (e) => {
+    processor.onaudioprocess = e => {
       if (!(websocket && websocket.readyState === WebSocket.OPEN && isSetupComplete)) return;
-      const input = e.inputBuffer.getChannelData(0);
-      const buffer = new ArrayBuffer(input.length * 2);
-      const view = new DataView(buffer);
-      for (let i = 0; i < input.length; i++) {
-        view.setInt16(i * 2, Math.max(-1, Math.min(1, input[i])) * 0x7FFF, true);
-      }
-      const base64Audio = btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
-      websocket.send(JSON.stringify({
-        realtimeInput: { audio: { mimeType: "audio/pcm;rate=16000", data: base64Audio } }
-      }));
+      const input = e.inputBuffer.getChannelData(0), view = new DataView(new ArrayBuffer(input.length * 2));
+      for (let i = 0; i < input.length; i++) view.setInt16(i * 2, Math.max(-1, Math.min(1, input[i])) * 0x7FFF, true);
+      websocket.send(JSON.stringify({ realtimeInput: { audio: { mimeType: "audio/pcm;rate=16000", data: btoa(String.fromCharCode.apply(null, new Uint8Array(view.buffer))) } } }));
     };
-  } catch (err) {
-    logMessage("Microphone error: " + err.message);
-    stopSession();
-  }
+  } catch (err) { logMessage("Microphone error: " + err.message); stopSession(); }
 }
 
 async function polishResume() {
-  const btn = document.getElementById('start-interview-btn');
-  polishing = true;
-  btn.disabled = true;
+  const btn = $('start-interview-btn');
+  if (!R.experience.length && !R.summary) { logMessage("Nothing to polish yet."); return; }
+  polishing = true; btn.disabled = true;
   logMessage("Asking Claude to write your summary...");
-  const jobRole = document.getElementById('targetRoles').value.split(',')[0].trim() || "Transit Systems Analyst";
   try {
-    const response = await fetch('/api/polish-resume', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jobRole,
-        schedule: document.getElementById('scheduleAvailability').value,
-        workArrangement: document.getElementById('workArrangement').value
-      })
-    });
-    if (response.ok) {
-      const data = await response.json();
-      if (data.summary) {
-        document.getElementById('resume-summary').textContent = data.summary;
-        logMessage("Resume summary updated.");
-      } else {
-        logMessage("The server returned no summary. Resume unchanged.");
-      }
-    } else {
-      logMessage(`Summary request failed (HTTP ${response.status}). Resume unchanged.`);
-    }
-  } catch (err) {
-    logMessage("Could not reach the server: " + err.message);
-  } finally {
-    polishing = false;
-    btn.disabled = false;
-  }
+    const r = await fetch('/api/polish-resume', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resume: R, job: JOB }) });
+    const d = await r.json();
+    if (r.ok && d.summary) { R.summary = d.summary; render(); logMessage("Resume summary updated."); }
+    else logMessage(`Summary request failed (${r.status}): ${d.error || 'no summary returned'}. Resume unchanged.`);
+  } catch (err) { logMessage("Could not reach the server: " + err.message); }
+  finally { polishing = false; btn.disabled = false; }
 }
+
+render();
 </script>
 </body>
 </html>
