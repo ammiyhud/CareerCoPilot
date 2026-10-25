@@ -33,7 +33,7 @@ export async function onRequest(context) {
                 'anthropic-version': '2023-06-01'
             },
             body: JSON.stringify({
-                model: 'claude-5-5-sonnet',
+                model: "claude-3-5-sonnet-20241022",
                 max_tokens: 200,
                 messages: [
                     { role: 'user', content: prompt }
