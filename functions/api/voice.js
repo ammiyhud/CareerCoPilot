@@ -57,6 +57,10 @@ export async function onRequest(context) {
         try { gemini.close(safeCode(e.code), 'client closed'); } catch (_) {}
     });
     gemini.addEventListener('close', (e) => {
+        console.log('Gemini closed', e.code, e.reason);
+        try {
+            server.send(JSON.stringify({ error: { message: `Gemini closed the session (${e.code}): ${e.reason || 'no reason given'}` } }));
+        } catch (_) {}
         try { server.close(safeCode(e.code), String(e.reason || 'upstream closed').slice(0, 120)); } catch (_) {}
     });
     gemini.addEventListener('error', () => {
