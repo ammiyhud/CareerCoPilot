@@ -237,7 +237,6 @@
             const btn = document.getElementById('start-interview-btn');
             
             if (websocket && websocket.readyState === WebSocket.OPEN) {
-                // End interview logic
                 websocket.close();
                 if (audioContext) audioContext.close();
                 if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
@@ -246,23 +245,19 @@
                 btn.style.backgroundColor = "var(--accent-blue)";
                 logMessage("Interview completed. Autonomously polishing executive STAR bullets...");
                 
-                // Automatically trigger Claude polish function
                 await polishResume();
                 return;
             }
 
             try {
-                // 1. Get Microphone Permissions & Stream
                 mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
                 const source = audioContext.createMediaStreamSource(mediaStream);
                 
-                // Process audio to 16-bit PCM for Gemini
                 processor = audioContext.createScriptProcessor(4096, 1, 1);
                 source.connect(processor);
                 processor.connect(audioContext.destination);
 
-                // 2. Connect to secure Cloudflare proxy
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 const wsUrl = `${protocol}//${window.location.host}/api/voice`;
                 websocket = new WebSocket(wsUrl);
@@ -270,15 +265,22 @@
                 websocket.onopen = () => {
                     logMessage("WebSocket connected to proxy. Establishing Audio Context...");
                     btn.innerText = "End Interview & Polish Resume";
-                    btn.style.backgroundColor = "#ef4444"; // Red for recording
+                    btn.style.backgroundColor = "#ef4444"; 
                     
                     const setupMessage = {
                         setup: {
-                            model: "models/gemini-1.5-flash",
+                            model: "models/gemini-2.0-flash-exp",
                             generationConfig: { responseModalities: ["AUDIO"] }
                         }
                     };
                     websocket.send(JSON.stringify(setupMessage));
+                };
+
+                websocket.onclose = () => {
+                    btn.innerText = "Start Voice Interview";
+                    btn.style.backgroundColor = "var(--accent-blue)";
+                    if(audioContext) audioContext.close();
+                    if(mediaStream) mediaStream.getTracks().forEach(track => track.stop());
                 };
 
                 websocket.onmessage = (event) => {
@@ -297,9 +299,8 @@
                     console.error("WS Error:", error);
                 };
 
-                // Send Audio Data to Proxy
                 processor.onaudioprocess = (e) => {
-                    if (websocket.readyState === WebSocket.OPEN) {
+                    if (websocket && websocket.readyState === WebSocket.OPEN) {
                         const inputData = e.inputBuffer.getChannelData(0);
                         const pcmData = new Int16Array(inputData.length);
                         for (let i = 0; i < inputData.length; i++) {
