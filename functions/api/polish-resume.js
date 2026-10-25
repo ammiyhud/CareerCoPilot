@@ -1,68 +1,26 @@
-export async function onRequest(context) {
-    // Only allow POST requests
-    if (context.request.method !== 'POST') {
-        return new Response('Method Not Allowed', { status: 405 });
-    }
-
+// Cloudflare Pages Function: functions/api/polish-resume.js
+export async function onRequestPost({ request, env }) {
+    const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'Content-Type': 'application/json' } });
     try {
-        // Grab the Anthropic API key from Cloudflare settings
-        const apiKey = context.env.ANTHROPIC_API_KEY;
-        if (!apiKey) {
-            return new Response(JSON.stringify({ error: 'Anthropic API key missing from Cloudflare environment' }), { 
-                status: 500,
-                headers: { 'Content-Type': 'application/json' }
-            });
-        }
+        if (!env.ANTHROPIC_API_KEY) return json({ error: 'ANTHROPIC_API_KEY is missing' }, 500);
+        const { resume, job } = await request.json();
+        if (!resume) return json({ error: 'No resume data received' }, 400);
 
-        // Parse the job details sent from your index.html frontend
-        const data = await context.request.json();
-        const { jobRole, schedule, workArrangement } = data;
+        const prompt = `You are an expert resume writer. Write a professional summary of 2 to 3 sentences for the candidate below.
+Use ONLY facts found in the resume data. Do not invent employers, tools, numbers, or achievements. Do not mention work hours or schedule.
+${job ? 'Tailor the wording to this target job: ' + JSON.stringify(job) : 'No target job was provided.'}
+Resume data: ${JSON.stringify(resume)}
+Output ONLY the summary text, with no quotation marks or extra commentary.`;
 
-        // Construct the prompt for Claude
-        const prompt = `You are an expert executive resume writer. The user is a Paratransit Dispatcher and Operations Supervisor applying for a ${jobRole || 'transit'} role. 
-        They require a ${workArrangement || 'hybrid'} work arrangement and are available ${schedule || 'standard hours'}.
-        Write a highly impactful, ATS-friendly professional summary tailored to this criteria.
-        Keep it under 3 sentences. Output ONLY the new summary text, no conversational filler or quotation marks.`;
-
-        // Call the Anthropic API with the upgraded model
-        const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01'
-            },
-            body: JSON.stringify({
-                model: "claude-sonnet-5-5",
-                max_tokens: 200,
-                messages: [
-                    { role: 'user', content: prompt }
-                ]
-            })
+            headers: { 'Content-Type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+            body: JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: 300, messages: [{ role: 'user', content: prompt }] })
         });
-
-        const result = await anthropicResponse.json();
-
-        // Handle Anthropic API errors
-        if (!anthropicResponse.ok) {
-            return new Response(JSON.stringify({ error: 'Anthropic API Error', details: result }), { 
-                status: anthropicResponse.status,
-                headers: { 'Content-Type': 'application/json' }
-            });
-        }
-
-        // Extract the generated text and send it back to the frontend canvas
-        const polishedSummary = result.content[0].text;
-        
-        return new Response(JSON.stringify({ summary: polishedSummary }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' }
-        });
-
-    } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), { 
-            status: 500,
-            headers: { 'Content-Type': 'application/json' }
-        });
+        const out = await res.json();
+        if (!res.ok) return json({ error: out.error?.message || 'Anthropic API error' }, res.status);
+        return json({ summary: (out.content?.[0]?.text || '').trim() });
+    } catch (err) {
+        return json({ error: err.message }, 500);
     }
 }
