@@ -198,7 +198,7 @@ async function startInterview() {
       websocket.send(JSON.stringify({
         setup: {
           model: GEMINI_MODEL,
-          responseModalities: ["AUDIO"],
+          generationConfig: { responseModalities: ["AUDIO"] },
           systemInstruction: { parts: [{ text: INTERVIEWER_PROMPT }] }
         }
       }));
