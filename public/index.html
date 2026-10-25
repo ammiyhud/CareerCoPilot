@@ -99,8 +99,8 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.btn-primary:foc
 </div>
 
 <script>
-const GEMINI_MODEL = "models/gemini-3.8-live";
-const USE_TOOLS = false; // set to false to test the voice interview without live resume updates
+const GEMINI_MODEL = "models/gemini-2.5-flash-native-audio-latest";
+const USE_TOOLS = true; // set to false to test the voice interview without live resume updates
 const INTERVIEWER_PROMPT = "You are a friendly resume interviewer. Speak in short, natural sentences and ask ONE question at a time. Start by asking the candidate's name and the job they want. Then go through each past job: title, employer, location, dates, daily duties, tools, and measurable results (ask for numbers when answers are vague). Then ask about skills and education. After EVERY answer, call update_resume with the new facts. Include only facts the candidate actually said or that appear in the provided documents. Never invent employers, dates, or numbers. If you are given existing resume data or a job description, do not re-ask what is already known; use the job description to decide which questions matter most.";
 const TOOLS = [{ functionDeclarations: [{
   name: "update_resume",
