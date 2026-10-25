@@ -225,11 +225,44 @@
         let mediaStream;
         let processor;
         let isSetupComplete = false;
+        let nextPlayTime = 0; // Tracks audio queue for smooth playback
 
         function logMessage(msg) {
             const logBox = document.getElementById('interview-log');
             logBox.innerHTML += `<br>> ${msg}`;
             logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        // The missing engine: Decodes Gemini's audio and pushes it to your speakers
+        function playAudioChunk(base64Audio) {
+            try {
+                const binaryString = atob(base64Audio);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                
+                const int16Array = new Int16Array(bytes.buffer);
+                const float32Array = new Float32Array(int16Array.length);
+                for (let i = 0; i < int16Array.length; i++) {
+                    float32Array[i] = int16Array[i] / 32768.0;
+                }
+
+                // Gemini sends audio at exactly 24000Hz
+                const audioBuffer = audioContext.createBuffer(1, float32Array.length, 24000);
+                audioBuffer.getChannelData(0).set(float32Array);
+
+                const source = audioContext.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(audioContext.destination);
+
+                const currentTime = audioContext.currentTime;
+                if (nextPlayTime < currentTime) nextPlayTime = currentTime;
+                source.start(nextPlayTime);
+                nextPlayTime += audioBuffer.duration;
+            } catch (e) {
+                console.error("Audio playback error:", e);
+            }
         }
 
         async function startInterview() {
@@ -263,11 +296,11 @@
 
                 websocket.onopen = () => {
                     isSetupComplete = false;
+                    nextPlayTime = 0;
                     logMessage("WebSocket connected. Sending setup payload...");
                     btn.innerText = "End Interview & Polish Resume";
                     btn.style.backgroundColor = "#ef4444"; 
                     
-                    // Added the missing generationConfig right here
                     const setupMessage = {
                         setup: {
                             model: "models/gemini-2.0-flash-exp",
@@ -293,9 +326,15 @@
                     
                     if (response.setupComplete) {
                         isSetupComplete = true;
-                        logMessage("Google AI connected and ready. Listening...");
-                    } else if (response.serverContent) {
-                        logMessage("Career Copilot. AI is responding...");
+                        logMessage("Google AI connected and ready. Say hello!");
+                    } else if (response.serverContent && response.serverContent.modelTurn) {
+                        // Extract and play the audio chunks Gemini sends back
+                        const parts = response.serverContent.modelTurn.parts;
+                        for (const part of parts) {
+                            if (part.inlineData && part.inlineData.data) {
+                                playAudioChunk(part.inlineData.data);
+                            }
+                        }
                     }
                 };
 
