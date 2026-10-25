@@ -1,20 +1,19 @@
 export async function onRequest(context) {
-    // 1. Verify this is a WebSocket request
+    // 1. Verify WebSocket upgrade
     const upgradeHeader = context.request.headers.get('Upgrade');
     if (!upgradeHeader || upgradeHeader !== 'websocket') {
         return new Response('Expected Upgrade: websocket', { status: 426 });
     }
 
-    // 2. Grab the API key we set up in Cloudflare earlier
+    // 2. Fetch Google API key
     const apiKey = context.env.GEMINI_API_KEY;
     if (!apiKey) {
         return new Response('API key missing from Cloudflare environment', { status: 500 });
     }
 
-    // 3. The precise v1alpha endpoint required for Gemini Live Audio
     const geminiUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
 
-    // 4. Create the two-way bridge (Frontend <--> Cloudflare <--> Google)
+    // 3. Create the WebSocket bridge
     const webSocketPair = new WebSocketPair();
     const [client, server] = Object.values(webSocketPair);
     
@@ -22,24 +21,33 @@ export async function onRequest(context) {
 
     try {
         const geminiSocket = new WebSocket(geminiUrl);
+        let isGeminiReady = false;
+        let messageQueue = []; // The waiting room for early payloads
 
-        // When Cloudflare connects to Google, start listening to your frontend
+        // When Google answers, flush any waiting messages (like the setup envelope)
         geminiSocket.addEventListener('open', () => {
-            server.addEventListener('message', (event) => {
-                if (geminiSocket.readyState === WebSocket.OPEN) {
-                    geminiSocket.send(event.data);
-                }
-            });
+            isGeminiReady = true;
+            while (messageQueue.length > 0) {
+                geminiSocket.send(messageQueue.shift());
+            }
         });
 
-        // When Google responds with audio/text, pipe it directly back to your frontend
+        // Listen to your frontend mic. If Google isn't ready, put the data in the waiting room.
+        server.addEventListener('message', (event) => {
+            if (isGeminiReady && geminiSocket.readyState === WebSocket.OPEN) {
+                geminiSocket.send(event.data);
+            } else {
+                messageQueue.push(event.data);
+            }
+        });
+
+        // Pipe Google's AI audio responses back to your frontend
         geminiSocket.addEventListener('message', (event) => {
             if (server.readyState === WebSocket.OPEN) {
                 server.send(event.data);
             }
         });
 
-        // If either side hangs up, close both connections cleanly
         geminiSocket.addEventListener('close', (event) => {
             server.close(event.code, event.reason);
         });
@@ -55,7 +63,6 @@ export async function onRequest(context) {
         server.close(1011, 'Failed to establish Gemini connection');
     }
 
-    // Send the handshake acceptance back to the browser
     return new Response(null, {
         status: 101,
         webSocket: client,
