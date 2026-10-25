@@ -224,8 +224,7 @@
         let audioContext;
         let mediaStream;
         let processor;
-        let isSetupComplete = false;
-        let nextPlayTime = 0; // Tracks audio queue for smooth playback
+        let nextPlayTime = 0;
 
         function logMessage(msg) {
             const logBox = document.getElementById('interview-log');
@@ -233,9 +232,10 @@
             logBox.scrollTop = logBox.scrollHeight;
         }
 
-        // The missing engine: Decodes Gemini's audio and pushes it to your speakers
         function playAudioChunk(base64Audio) {
             try {
+                if (!audioContext || audioContext.state === 'closed') return;
+                
                 const binaryString = atob(base64Audio);
                 const bytes = new Uint8Array(binaryString.length);
                 for (let i = 0; i < binaryString.length; i++) {
@@ -248,7 +248,6 @@
                     float32Array[i] = int16Array[i] / 32768.0;
                 }
 
-                // Gemini sends audio at exactly 24000Hz
                 const audioBuffer = audioContext.createBuffer(1, float32Array.length, 24000);
                 audioBuffer.getChannelData(0).set(float32Array);
 
@@ -270,7 +269,9 @@
             
             if (websocket && websocket.readyState === WebSocket.OPEN) {
                 websocket.close();
-                if (audioContext) audioContext.close();
+                if (audioContext && audioContext.state !== 'closed') {
+                    audioContext.close().catch(console.error);
+                }
                 if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
                 
                 btn.innerText = "Start Voice Interview";
@@ -295,9 +296,8 @@
                 websocket = new WebSocket(wsUrl);
 
                 websocket.onopen = () => {
-                    isSetupComplete = false;
                     nextPlayTime = 0;
-                    logMessage("WebSocket connected. Sending setup payload...");
+                    logMessage("Google AI connected and listening. Say hello!");
                     btn.innerText = "End Interview & Polish Resume";
                     btn.style.backgroundColor = "#ef4444"; 
                     
@@ -313,22 +313,19 @@
                 };
 
                 websocket.onclose = (event) => {
-                    isSetupComplete = false;
                     btn.innerText = "Start Voice Interview";
                     btn.style.backgroundColor = "var(--accent-blue)";
                     logMessage(`Session disconnected by server. (Code: ${event.code})`);
-                    if(audioContext) audioContext.close();
+                    if (audioContext && audioContext.state !== 'closed') {
+                        audioContext.close().catch(console.error);
+                    }
                     if(mediaStream) mediaStream.getTracks().forEach(track => track.stop());
                 };
 
                 websocket.onmessage = (event) => {
                     const response = JSON.parse(event.data);
                     
-                    if (response.setupComplete) {
-                        isSetupComplete = true;
-                        logMessage("Google AI connected and ready. Say hello!");
-                    } else if (response.serverContent && response.serverContent.modelTurn) {
-                        // Extract and play the audio chunks Gemini sends back
+                    if (response.serverContent && response.serverContent.modelTurn) {
                         const parts = response.serverContent.modelTurn.parts;
                         for (const part of parts) {
                             if (part.inlineData && part.inlineData.data) {
@@ -343,7 +340,7 @@
                 };
 
                 processor.onaudioprocess = (e) => {
-                    if (websocket && websocket.readyState === WebSocket.OPEN && isSetupComplete) {
+                    if (websocket && websocket.readyState === WebSocket.OPEN) {
                         const inputData = e.inputBuffer.getChannelData(0);
                         const pcmData = new Int16Array(inputData.length);
                         for (let i = 0; i < inputData.length; i++) {
