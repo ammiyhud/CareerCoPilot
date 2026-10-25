@@ -1,65 +1,68 @@
-export async function onRequestPost(context) {
-	try {
-		const { rawNotes, targetRole, industry } = await context.request.json();
-		const apiKey = context.env.ANTHROPIC_API_KEY;
+export async function onRequest(context) {
+    // Only allow POST requests
+    if (context.request.method !== 'POST') {
+        return new Response('Method Not Allowed', { status: 405 });
+    }
 
-		if (!apiKey) {
-			return new Response(JSON.stringify({ error: "Missing ANTHROPIC_API_KEY secret." }), {
-				status: 500,
-				headers: { "Content-Type": "application/json" }
-			});
-		}
+    try {
+        // Grab the Anthropic API key from Cloudflare settings
+        const apiKey = context.env.ANTHROPIC_API_KEY;
+        if (!apiKey) {
+            return new Response(JSON.stringify({ error: 'Anthropic API key missing from Cloudflare environment' }), { 
+                status: 500,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
 
-		const systemPrompt = `You are an elite executive resume writer and ATS specialist.
-Transform the candidate's raw conversational notes into a structured, high-impact resume.
-Rules:
-1. Format all work experience bullets using the STAR methodology (Situation, Task, Action, Result) with quantified metrics.
-2. Eliminate all cliché corporate filler phrases. Write in active, punchy past tense.
-3. Return ONLY a valid JSON object matching the requested schema with no surrounding Markdown fences.`;
+        // Parse the job details sent from your index.html frontend
+        const data = await context.request.json();
+        const { jobRole, schedule, workArrangement } = data;
 
-		const userPrompt = `Target Role: ${targetRole || 'Not specified'}
-Target Industry: ${industry || 'Not specified'}
-Raw Interview Transcript and Extracted Notes:
-${JSON.stringify(rawNotes, null, 2)}
+        // Construct the prompt for Claude
+        const prompt = `You are an expert executive resume writer. The user is a Paratransit Dispatcher and Operations Supervisor applying for a ${jobRole || 'transit'} role. 
+        They require a ${workArrangement || 'hybrid'} work arrangement and are available ${schedule || 'standard hours'}.
+        Write a highly impactful, ATS-friendly professional summary tailored to this criteria.
+        Keep it under 3 sentences. Output ONLY the new summary text, no conversational filler or quotation marks.`;
 
-Produce a JSON response with keys:
-- fullName
-- title
-- contact: { email, phone, location, linkedin }
-- summary
-- skills: array of strings
-- experience: array of objects [{ company, role, dates, location, accomplishments: [bullets] }]
-- education: array of objects [{ institution, degree, year }]
-- certifications: array of strings`;
+        // Call the Anthropic API with the upgraded model
+        const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01'
+            },
+            body: JSON.stringify({
+                model: 'claude-5-5-sonnet',
+                max_tokens: 200,
+                messages: [
+                    { role: 'user', content: prompt }
+                ]
+            })
+        });
 
-		const anthropicResponse = await fetch("https://api.anthropic.com/v1/messages", {
-			method: "POST",
-			headers: {
-				"x-api-key": apiKey,
-				"anthropic-version": "2023-06-01",
-				"content-type": "application/json"
-			},
-			body: JSON.stringify({
-				model: "claude-3-5-sonnet-20241022",
-				max_tokens: 2500,
-				temperature: 0.2,
-				system: systemPrompt,
-				messages: [{ role: "user", content: userPrompt }]
-			})
-		});
+        const result = await anthropicResponse.json();
 
-		const data = await anthropicResponse.json();
-		const polishedText = data.content?.[0]?.text || "{}";
-		const cleanJson = polishedText.replace(/```json/g, "").replace(/```/g, "").trim();
-		const parsedData = JSON.parse(cleanJson);
+        // Handle Anthropic API errors
+        if (!anthropicResponse.ok) {
+            return new Response(JSON.stringify({ error: 'Anthropic API Error', details: result }), { 
+                status: anthropicResponse.status,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
 
-		return new Response(JSON.stringify({ success: true, resume: parsedData }), {
-			headers: { "Content-Type": "application/json" }
-		});
-	} catch (err) {
-		return new Response(JSON.stringify({ error: err.message }), {
-			status: 500,
-			headers: { "Content-Type": "application/json" }
-		});
-	}
+        // Extract the generated text and send it back to the frontend canvas
+        const polishedSummary = result.content[0].text;
+        
+        return new Response(JSON.stringify({ summary: polishedSummary }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+    } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), { 
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
 }
