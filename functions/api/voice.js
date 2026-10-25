@@ -1,70 +1,72 @@
+// Cloudflare Pages Function: functions/api/voice.js
+// Bridges the browser's WebSocket to Gemini's Live API.
+
+const MAX_SESSION_MS = 10 * 60 * 1000; // hard stop so a session can't run forever
+
+// Close codes like 1005/1006 are reserved and throw if passed to close().
+function safeCode(code) {
+    if (!code || code < 1000 || code >= 5000) return 1000;
+    return [1004, 1005, 1006, 1015].includes(code) ? 1000 : code;
+}
+
+// Gemini may send JSON as binary frames; the browser code expects text.
+function toText(data) {
+    return typeof data === 'string' ? data : new TextDecoder().decode(data);
+}
+
 export async function onRequest(context) {
-    // 1. Verify WebSocket upgrade
-    const upgradeHeader = context.request.headers.get('Upgrade');
-    if (!upgradeHeader || upgradeHeader !== 'websocket') {
+    const { request, env } = context;
+
+    if (request.headers.get('Upgrade') !== 'websocket') {
         return new Response('Expected Upgrade: websocket', { status: 426 });
     }
 
-    // 2. Fetch Google API key
-    const apiKey = context.env.GEMINI_API_KEY;
-    if (!apiKey) {
-        return new Response('API key missing from Cloudflare environment', { status: 500 });
+    // Only accept connections from your own site (stops casual abuse of your key).
+    const origin = request.headers.get('Origin');
+    if (origin && new URL(origin).host !== new URL(request.url).host) {
+        return new Response('Forbidden', { status: 403 });
     }
 
-    const geminiUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
+    if (!env.GEMINI_API_KEY) {
+        return new Response('Server is not configured', { status: 500 });
+    }
 
-    // 3. Create the WebSocket bridge
-    const webSocketPair = new WebSocketPair();
-    const [client, server] = Object.values(webSocketPair);
-    
+    // Open the upstream socket the documented Workers way: fetch with Upgrade.
+    const upstream = await fetch(
+        'https://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=' +
+            env.GEMINI_API_KEY,
+        { headers: { Upgrade: 'websocket' } }
+    );
+    const gemini = upstream.webSocket;
+    if (!gemini) {
+        return new Response('Could not reach Gemini', { status: 502 });
+    }
+    gemini.accept(); // already open, so no message queue is needed
+
+    const [client, server] = Object.values(new WebSocketPair());
     server.accept();
 
-    try {
-        const geminiSocket = new WebSocket(geminiUrl);
-        let isGeminiReady = false;
-        let messageQueue = []; // The waiting room for early payloads
-
-        // When Google answers, flush any waiting messages (like the setup envelope)
-        geminiSocket.addEventListener('open', () => {
-            isGeminiReady = true;
-            while (messageQueue.length > 0) {
-                geminiSocket.send(messageQueue.shift());
-            }
-        });
-
-        // Listen to your frontend mic. If Google isn't ready, put the data in the waiting room.
-        server.addEventListener('message', (event) => {
-            if (isGeminiReady && geminiSocket.readyState === WebSocket.OPEN) {
-                geminiSocket.send(event.data);
-            } else {
-                messageQueue.push(event.data);
-            }
-        });
-
-        // Pipe Google's AI audio responses back to your frontend
-        geminiSocket.addEventListener('message', (event) => {
-            if (server.readyState === WebSocket.OPEN) {
-                server.send(event.data);
-            }
-        });
-
-        geminiSocket.addEventListener('close', (event) => {
-            server.close(event.code, event.reason);
-        });
-        server.addEventListener('close', (event) => {
-            geminiSocket.close(event.code, event.reason);
-        });
-
-        geminiSocket.addEventListener('error', (error) => {
-            server.close(1011, 'Gemini connection error');
-        });
-
-    } catch (err) {
-        server.close(1011, 'Failed to establish Gemini connection');
-    }
-
-    return new Response(null, {
-        status: 101,
-        webSocket: client,
+    server.addEventListener('message', (e) => {
+        try { gemini.send(e.data); } catch (_) {}
     });
+    gemini.addEventListener('message', (e) => {
+        try { server.send(toText(e.data)); } catch (_) {}
+    });
+
+    server.addEventListener('close', (e) => {
+        try { gemini.close(safeCode(e.code), 'client closed'); } catch (_) {}
+    });
+    gemini.addEventListener('close', (e) => {
+        try { server.close(safeCode(e.code), 'upstream closed'); } catch (_) {}
+    });
+    gemini.addEventListener('error', () => {
+        try { server.close(1011, 'Gemini connection error'); } catch (_) {}
+    });
+
+    setTimeout(() => {
+        try { server.close(1000, 'Session time limit'); } catch (_) {}
+        try { gemini.close(1000, 'Session time limit'); } catch (_) {}
+    }, MAX_SESSION_MS);
+
+    return new Response(null, { status: 101, webSocket: client });
 }
