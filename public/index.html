@@ -224,6 +224,7 @@
         let audioContext;
         let mediaStream;
         let processor;
+        let isSetupComplete = false;
         let nextPlayTime = 0;
 
         function logMessage(msg) {
@@ -296,8 +297,9 @@
                 websocket = new WebSocket(wsUrl);
 
                 websocket.onopen = () => {
+                    isSetupComplete = false;
                     nextPlayTime = 0;
-                    logMessage("Google AI connected and listening. Say hello!");
+                    logMessage("WebSocket connected. Sending setup payload...");
                     btn.innerText = "End Interview & Polish Resume";
                     btn.style.backgroundColor = "#ef4444"; 
                     
@@ -313,6 +315,7 @@
                 };
 
                 websocket.onclose = (event) => {
+                    isSetupComplete = false;
                     btn.innerText = "Start Voice Interview";
                     btn.style.backgroundColor = "var(--accent-blue)";
                     logMessage(`Session disconnected by server. (Code: ${event.code})`);
@@ -325,7 +328,10 @@
                 websocket.onmessage = (event) => {
                     const response = JSON.parse(event.data);
                     
-                    if (response.serverContent && response.serverContent.modelTurn) {
+                    if (response.setupComplete) {
+                        isSetupComplete = true;
+                        logMessage("Google AI connected and ready. Say hello!");
+                    } else if (response.serverContent && response.serverContent.modelTurn) {
                         const parts = response.serverContent.modelTurn.parts;
                         for (const part of parts) {
                             if (part.inlineData && part.inlineData.data) {
@@ -340,7 +346,7 @@
                 };
 
                 processor.onaudioprocess = (e) => {
-                    if (websocket && websocket.readyState === WebSocket.OPEN) {
+                    if (websocket && websocket.readyState === WebSocket.OPEN && isSetupComplete) {
                         const inputData = e.inputBuffer.getChannelData(0);
                         const pcmData = new Int16Array(inputData.length);
                         for (let i = 0; i < inputData.length; i++) {
