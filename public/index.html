@@ -263,22 +263,22 @@
                 websocket = new WebSocket(wsUrl);
 
                 websocket.onopen = () => {
-                    logMessage("WebSocket connected to proxy. Establishing Audio Context...");
+                    logMessage("WebSocket connected. Establishing Audio Context...");
                     btn.innerText = "End Interview & Polish Resume";
                     btn.style.backgroundColor = "#ef4444"; 
                     
                     const setupMessage = {
                         setup: {
-                            model: "models/gemini-2.0-flash-exp",
-                            generationConfig: { responseModalities: ["AUDIO"] }
+                            model: "models/gemini-2.0-flash-exp"
                         }
                     };
                     websocket.send(JSON.stringify(setupMessage));
                 };
 
-                websocket.onclose = () => {
+                websocket.onclose = (event) => {
                     btn.innerText = "Start Voice Interview";
                     btn.style.backgroundColor = "var(--accent-blue)";
+                    logMessage(`Session disconnected by server. (Code: ${event.code})`);
                     if(audioContext) audioContext.close();
                     if(mediaStream) mediaStream.getTracks().forEach(track => track.stop());
                 };
@@ -314,16 +314,16 @@
                         }
                         const base64Audio = btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
 
-                        const clientContent = {
-                            clientContent: {
-                                turns: [{
-                                    role: "user",
-                                    parts: [{ inlineData: { mimeType: "audio/pcm;rate=16000", data: base64Audio } }]
-                                }],
-                                turnComplete: true
+                        // The correct envelope for Gemini Live audio streaming
+                        const audioPayload = {
+                            realtimeInput: {
+                                mediaChunks: [{
+                                    mimeType: "audio/pcm;rate=16000",
+                                    data: base64Audio
+                                }]
                             }
                         };
-                        websocket.send(JSON.stringify(clientContent));
+                        websocket.send(JSON.stringify(audioPayload));
                     }
                 };
 
