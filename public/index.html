@@ -189,7 +189,7 @@
     <div class="right-column">
         <div class="header-bar">
             <span>● LIVE RESUME CANVAS</span>
-            <span>Updated autonomously via Claude 3.5 Sonnet</span>
+            <span>Updated autonomously via Claude</span>
         </div>
         <div class="resume-canvas" id="resume-content">
             <div class="resume-header">
@@ -267,9 +267,13 @@
                     btn.innerText = "End Interview & Polish Resume";
                     btn.style.backgroundColor = "#ef4444"; 
                     
+                    // Added the missing generationConfig right here
                     const setupMessage = {
                         setup: {
-                            model: "models/gemini-2.0-flash-exp"
+                            model: "models/gemini-2.0-flash-exp",
+                            generationConfig: { 
+                                responseModalities: ["AUDIO"] 
+                            }
                         }
                     };
                     websocket.send(JSON.stringify(setupMessage));
