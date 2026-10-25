@@ -33,7 +33,7 @@ export async function onRequest(context) {
 
     // Open the upstream socket the documented Workers way: fetch with Upgrade.
     const upstream = await fetch(
-        'https://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=' +
+        'https://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=' +
             env.GEMINI_API_KEY,
         { headers: { Upgrade: 'websocket' } }
     );
@@ -57,7 +57,7 @@ export async function onRequest(context) {
         try { gemini.close(safeCode(e.code), 'client closed'); } catch (_) {}
     });
     gemini.addEventListener('close', (e) => {
-        try { server.close(safeCode(e.code), 'upstream closed'); } catch (_) {}
+        try { server.close(safeCode(e.code), String(e.reason || 'upstream closed').slice(0, 120)); } catch (_) {}
     });
     gemini.addEventListener('error', () => {
         try { server.close(1011, 'Gemini connection error'); } catch (_) {}
