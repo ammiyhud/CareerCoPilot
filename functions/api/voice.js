@@ -46,12 +46,21 @@ export async function onRequest(context) {
     const [client, server] = Object.values(new WebSocketPair());
     server.accept();
 
+    const note = (t) => { try { server.send(JSON.stringify({ debug: t })); } catch (_) {} };
+    let fromClient = 0, fromGoogle = 0;
+    note('Proxy connected to Google.');
+
     server.addEventListener('message', (e) => {
+        if (fromClient++ === 0) note('Proxy got your setup message and sent it to Google.');
         try { gemini.send(e.data); } catch (_) {}
     });
     gemini.addEventListener('message', (e) => {
+        fromGoogle++;
         try { server.send(toText(e.data)); } catch (_) {}
     });
+    setTimeout(() => {
+        if (fromGoogle === 0) note(`Google has sent nothing back after 6 seconds (messages from you: ${fromClient}).`);
+    }, 6000);
 
     server.addEventListener('close', (e) => {
         try { gemini.close(safeCode(e.code), 'client closed'); } catch (_) {}
