@@ -139,7 +139,6 @@
 <body>
 
     <div class="left-column">
-        <!-- Voice Interview Panel -->
         <div class="panel">
             <div class="header-bar">
                 <span>● SESSION STANDBY</span>
@@ -154,7 +153,6 @@
             </div>
         </div>
 
-        <!-- Application Rules Panel -->
         <div class="panel">
             <div class="header-bar">
                 <span>⚙ AUTONOMOUS APPLICATION RULES</span>
@@ -226,6 +224,7 @@
         let audioContext;
         let mediaStream;
         let processor;
+        let isSetupComplete = false;
 
         function logMessage(msg) {
             const logBox = document.getElementById('interview-log');
@@ -263,7 +262,8 @@
                 websocket = new WebSocket(wsUrl);
 
                 websocket.onopen = () => {
-                    logMessage("WebSocket connected. Establishing Audio Context...");
+                    isSetupComplete = false;
+                    logMessage("WebSocket connected. Sending setup payload...");
                     btn.innerText = "End Interview & Polish Resume";
                     btn.style.backgroundColor = "#ef4444"; 
                     
@@ -276,6 +276,7 @@
                 };
 
                 websocket.onclose = (event) => {
+                    isSetupComplete = false;
                     btn.innerText = "Start Voice Interview";
                     btn.style.backgroundColor = "var(--accent-blue)";
                     logMessage(`Session disconnected by server. (Code: ${event.code})`);
@@ -284,23 +285,22 @@
                 };
 
                 websocket.onmessage = (event) => {
-                    if (event.data instanceof Blob) {
-                        console.log("Received audio chunk from Gemini.");
-                    } else {
-                        const response = JSON.parse(event.data);
-                        if(response.serverContent) {
-                            logMessage("Career Copilot. AI is responding...");
-                        }
+                    const response = JSON.parse(event.data);
+                    
+                    if (response.setupComplete) {
+                        isSetupComplete = true;
+                        logMessage("Google AI connected and ready. Listening...");
+                    } else if (response.serverContent) {
+                        logMessage("Career Copilot. AI is responding...");
                     }
                 };
 
                 websocket.onerror = (error) => {
-                    logMessage(`WebSocket Error. Verify proxy connection and Cloudflare logs.`);
-                    console.error("WS Error:", error);
+                    logMessage(`WebSocket Error. Verify proxy connection.`);
                 };
 
                 processor.onaudioprocess = (e) => {
-                    if (websocket && websocket.readyState === WebSocket.OPEN) {
+                    if (websocket && websocket.readyState === WebSocket.OPEN && isSetupComplete) {
                         const inputData = e.inputBuffer.getChannelData(0);
                         const pcmData = new Int16Array(inputData.length);
                         for (let i = 0; i < inputData.length; i++) {
@@ -314,7 +314,6 @@
                         }
                         const base64Audio = btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
 
-                        // The correct envelope for Gemini Live audio streaming
                         const audioPayload = {
                             realtimeInput: {
                                 mediaChunks: [{
