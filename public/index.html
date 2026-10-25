@@ -1,408 +1,288 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Career Copilot. AI</title>
-    <style>
-        :root {
-            --bg-color: #0b0f19;
-            --panel-bg: #111827;
-            --text-primary: #f3f4f6;
-            --text-secondary: #9ca3af;
-            --accent-blue: #3b82f6;
-            --accent-purple: #8b5cf6;
-            --border-color: #1f2937;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-primary);
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            gap: 20px;
-            height: 100vh;
-            box-sizing: border-box;
-        }
-        .left-column {
-            width: 35%;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-        .right-column {
-            width: 65%;
-            background-color: var(--panel-bg);
-            border-radius: 12px;
-            border: 1px solid var(--border-color);
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-        }
-        .panel {
-            background-color: var(--panel-bg);
-            border-radius: 12px;
-            border: 1px solid var(--border-color);
-            padding: 20px;
-        }
-        .header-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            font-size: 12px;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        .orb-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 200px;
-            margin-bottom: 20px;
-        }
-        .orb {
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            background: radial-gradient(circle, var(--accent-blue) 0%, transparent 70%);
-            box-shadow: 0 0 50px rgba(59, 130, 246, 0.3);
-            animation: pulse 2s infinite ease-in-out;
-        }
-        @keyframes pulse {
-            0% { transform: scale(0.95); opacity: 0.8; }
-            50% { transform: scale(1.05); opacity: 1; }
-            100% { transform: scale(0.95); opacity: 0.8; }
-        }
-        .btn-primary {
-            width: 100%;
-            padding: 12px;
-            background-color: var(--accent-blue);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        .btn-primary:hover { background-color: #2563eb; }
-        .log-box {
-            background-color: #000;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 15px;
-            font-family: monospace;
-            font-size: 12px;
-            color: #a7f3d0;
-            height: 120px;
-            overflow-y: auto;
-            margin-top: 15px;
-        }
-        .input-group { margin-bottom: 15px; }
-        label {
-            display: block;
-            font-size: 12px;
-            color: var(--text-secondary);
-            margin-bottom: 5px;
-        }
-        input, select {
-            width: 100%;
-            padding: 10px;
-            background-color: #000;
-            border: 1px solid var(--border-color);
-            color: white;
-            border-radius: 6px;
-            box-sizing: border-box;
-        }
-        .resume-canvas {
-            background-color: white;
-            color: black;
-            flex-grow: 1;
-            border-radius: 8px;
-            padding: 40px;
-            overflow-y: auto;
-        }
-        .resume-header { text-align: center; margin-bottom: 30px; }
-        .resume-name { font-size: 24px; font-weight: bold; margin: 0; }
-        .resume-title { color: var(--accent-blue); font-weight: bold; font-size: 14px; margin-top: 5px; }
-        .resume-contact { font-size: 12px; color: #4b5563; margin-top: 5px; }
-        .section-title { font-size: 14px; font-weight: bold; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; margin-bottom: 15px; margin-top: 25px; }
-        .experience-item { margin-bottom: 15px; }
-        .experience-header { display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; }
-        .experience-sub { font-size: 12px; color: #4b5563; margin-bottom: 5px; }
-        ul { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.5; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Career Copilot. AI</title>
+<style>
+:root{--bg-color:#0b0f19;--panel-bg:#111827;--text-primary:#f3f4f6;--text-secondary:#9ca3af;--accent-blue:#3b82f6;--border-color:#1f2937}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg-color);color:var(--text-primary);margin:0;padding:20px;display:flex;gap:20px;height:100dvh;overflow:hidden}
+.left-column{width:35%;display:flex;flex-direction:column;gap:20px;min-height:0;overflow-y:auto;padding-right:4px}
+.left-column>.panel{flex-shrink:0}
+.right-column{width:65%;min-height:0;background:var(--panel-bg);border-radius:12px;border:1px solid var(--border-color);padding:20px;display:flex;flex-direction:column}
+.panel{background:var(--panel-bg);border-radius:12px;border:1px solid var(--border-color);padding:20px}
+.header-bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:20px;font-size:12px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:1px}
+.orb-container{display:flex;justify-content:center;align-items:center;height:200px;margin-bottom:20px}
+.orb{width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,var(--accent-blue) 0%,transparent 70%);box-shadow:0 0 50px rgba(59,130,246,.3);animation:pulse 2s infinite ease-in-out}
+@keyframes pulse{0%{transform:scale(.95);opacity:.8}50%{transform:scale(1.05);opacity:1}100%{transform:scale(.95);opacity:.8}}
+@media (prefers-reduced-motion:reduce){.orb{animation:none}}
+.btn-primary{width:100%;padding:12px;background:var(--accent-blue);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background-color .2s}
+.btn-primary:hover{background:#2563eb}
+.btn-primary:disabled{opacity:.6;cursor:wait}
+.log-box{background:#000;border:1px solid var(--border-color);border-radius:8px;padding:15px;font-family:monospace;font-size:12px;color:#a7f3d0;height:140px;overflow-y:auto;margin-top:15px;line-height:1.5}
+.input-group{margin-bottom:15px}
+label{display:block;font-size:12px;color:var(--text-secondary);margin-bottom:5px}
+input,select{width:100%;padding:10px;background:#000;border:1px solid var(--border-color);color:#fff;border-radius:6px;font-size:14px;text-overflow:ellipsis}
+input:focus-visible,select:focus-visible,.btn-primary:focus-visible{outline:2px solid var(--accent-blue);outline-offset:2px}
+.row{display:flex;gap:10px}
+.row .input-group{flex:1;min-width:0}
+.resume-canvas{background:#fff;color:#000;flex-grow:1;min-height:0;border-radius:8px;padding:40px;overflow-y:auto}
+.resume-header{text-align:center;margin-bottom:30px}
+.resume-name{font-size:24px;font-weight:bold;margin:0}
+.resume-title{color:var(--accent-blue);font-weight:bold;font-size:14px;margin-top:5px}
+.resume-contact{font-size:12px;color:#4b5563;margin-top:5px}
+.section-title{font-size:14px;font-weight:bold;border-bottom:1px solid #e5e7eb;padding-bottom:5px;margin:25px 0 15px}
+.experience-item{margin-bottom:15px}
+.experience-header{display:flex;justify-content:space-between;gap:10px;font-weight:bold;font-size:14px}
+.experience-sub{font-size:12px;color:#4b5563;margin-bottom:5px}
+.resume-canvas ul{margin:0;padding-left:20px;font-size:13px;line-height:1.5}
+#resume-summary{font-size:13px;line-height:1.5}
+@media (max-width:800px){
+  body{flex-direction:column;height:auto;overflow:auto;padding:12px}
+  .left-column,.right-column{width:100%;overflow:visible;padding-right:0}
+  .right-column{padding:14px}
+  .resume-canvas{padding:20px;overflow:visible}
+  .experience-header{flex-direction:column;gap:2px}
+  .row{flex-direction:column;gap:0}
+}
+</style>
 </head>
 <body>
 
-    <div class="left-column">
-        <div class="panel">
-            <div class="header-bar">
-                <span>● SESSION STANDBY</span>
-                <span>Career Copilot. AI</span>
-            </div>
-            <div class="orb-container">
-                <div class="orb" id="voice-orb"></div>
-            </div>
-            <button class="btn-primary" id="start-interview-btn" onclick="startInterview()">Start Voice Interview</button>
-            <div class="log-box" id="interview-log">
-                System initialized. Ready to begin.
-            </div>
-        </div>
+<div class="left-column">
+  <div class="panel">
+    <div class="header-bar"><span id="status">● SESSION STANDBY</span><span>Career Copilot. AI</span></div>
+    <div class="orb-container"><div class="orb" id="voice-orb"></div></div>
+    <button class="btn-primary" id="start-interview-btn" onclick="startInterview()">Start Voice Interview</button>
+    <div class="log-box" id="interview-log" aria-live="polite">System initialized. Ready to begin.</div>
+  </div>
 
-        <div class="panel">
-            <div class="header-bar">
-                <span>⚙ AUTONOMOUS APPLICATION RULES</span>
-            </div>
-            <div class="input-group">
-                <label>Target Roles (Comma-separated)</label>
-                <input type="text" value="Transit Systems Analyst, Business Systems Analyst, Operations Supervisor">
-            </div>
-            <div style="display: flex; gap: 10px;">
-                <div class="input-group" style="flex: 1;">
-                    <label>Min Base Salary</label>
-                    <input type="text" value="$90,000 / yr">
-                </div>
-                <div class="input-group" style="flex: 1;">
-                    <label>Work Arrangement</label>
-                    <select id="workArrangement">
-                        <option value="remote">Remote Only</option>
-                        <option value="onsite">On-Site Only</option>
-                        <option value="hybrid" selected>Remote & On-Site (Hybrid)</option>
-                    </select>
-                </div>
-            </div>
-            <div class="input-group">
-                <label>Schedule Availability</label>
-                <input type="text" id="scheduleAvailability" value="1:30 AM to 3:00 PM">
-            </div>
-            <div class="input-group">
-                <label>Test Hybrid Dispatcher (Paste Job Posting URL)</label>
-                <input type="text" value="https://boards.greenhouse.io/...">
-            </div>
-        </div>
+  <div class="panel">
+    <div class="header-bar"><span>⚙ AUTONOMOUS APPLICATION RULES</span></div>
+    <div class="input-group">
+      <label for="targetRoles">Target Roles (Comma-separated)</label>
+      <input type="text" id="targetRoles" value="Transit Systems Analyst, Business Systems Analyst, Operations Supervisor">
+    </div>
+    <div class="row">
+      <div class="input-group">
+        <label for="minSalary">Min Base Salary</label>
+        <input type="text" id="minSalary" value="$90,000 / yr">
+      </div>
+      <div class="input-group">
+        <label for="workArrangement">Work Arrangement</label>
+        <select id="workArrangement">
+          <option value="remote">Remote</option>
+          <option value="onsite">On-site</option>
+          <option value="hybrid" selected>Hybrid</option>
+        </select>
+      </div>
+    </div>
+    <div class="input-group">
+      <label for="scheduleAvailability">Schedule Availability</label>
+      <input type="text" id="scheduleAvailability" value="1:30 AM to 3:00 PM">
+    </div>
+    <div class="input-group">
+      <label for="jobUrl">Test Hybrid Dispatcher (Paste Job Posting URL)</label>
+      <input type="text" id="jobUrl" value="https://boards.greenhouse.io/...">
+    </div>
+  </div>
+</div>
+
+<div class="right-column">
+  <div class="header-bar"><span>● LIVE RESUME CANVAS</span><span>Updated autonomously via Claude</span></div>
+  <div class="resume-canvas" id="resume-content">
+    <div class="resume-header">
+      <h1 class="resume-name">AMMIYHUD ISRAEL</h1>
+      <div class="resume-title">TRANSIT SYSTEMS ANALYST &amp; OPERATIONS SPECIALIST</div>
+      <div class="resume-contact">Sterling Heights, MI • dispatch-systems@domain.com • Class A CDL (Passenger Endorsement)</div>
     </div>
 
-    <div class="right-column">
-        <div class="header-bar">
-            <span>● LIVE RESUME CANVAS</span>
-            <span>Updated autonomously via Claude</span>
-        </div>
-        <div class="resume-canvas" id="resume-content">
-            <div class="resume-header">
-                <h1 class="resume-name">AMMIYHUD ISRAEL</h1>
-                <div class="resume-title">TRANSIT SYSTEMS ANALYST & OPERATIONS SPECIALIST</div>
-                <div class="resume-contact">Sterling Heights, MI • dispatch-systems@domain.com • Class A CDL (Passenger Endorsement)</div>
-            </div>
+    <div class="section-title">PROFESSIONAL SUMMARY</div>
+    <p id="resume-summary">Results-driven Operations Dispatcher and Paratransit Systems Supervisor with extensive experience directing large-scale fixed-route scheduling, compliance, and real-time transit logistics. Proven expertise in driver management, regulatory ADA adherence, route optimization, and technical troubleshooting across enterprise transit management platforms.</p>
 
-            <div class="section-title">PROFESSIONAL SUMMARY</div>
-            <p style="font-size: 13px; line-height: 1.5;" id="resume-summary">
-                Results-driven Operations Dispatcher and Paratransit Systems Supervisor with extensive experience directing large-scale fixed-route scheduling, compliance, and real-time transit logistics. Proven expertise in driver management, regulatory ADA adherence, route optimization, and technical troubleshooting across enterprise transit management platforms.
-            </p>
-
-            <div class="section-title">PROFESSIONAL EXPERIENCE</div>
-            <div class="experience-item">
-                <div class="experience-header">
-                    <span>Paratransit Dispatcher & Operations Supervisor</span>
-                    <span>2024 - Present</span>
-                </div>
-                <div class="experience-sub">Suburban Mobility Authority for Regional Transportation (SMART) | Troy, MI</div>
-                <ul id="resume-bullets">
-                    <li>Orchestrate daily dispatch operations, route tracking, and manifest assignments for fleet operators across Macomb County.</li>
-                    <li>Maintain 98%+ on-time transit performance through dynamic schedule adjustment and real-time detour routing.</li>
-                    <li>Enforce state and federal regulatory compliance, operator log audits, and passenger safety protocols.</li>
-                </ul>
-            </div>
-        </div>
+    <div class="section-title">PROFESSIONAL EXPERIENCE</div>
+    <div class="experience-item">
+      <div class="experience-header"><span>Paratransit Dispatcher &amp; Operations Supervisor</span><span>2024 - Present</span></div>
+      <div class="experience-sub">Suburban Mobility Authority for Regional Transportation (SMART) | Troy, MI</div>
+      <ul id="resume-bullets">
+        <li>Orchestrate daily dispatch operations, route tracking, and manifest assignments for fleet operators across Macomb County.</li>
+        <li>Maintain 98%+ on-time transit performance through dynamic schedule adjustment and real-time detour routing.</li>
+        <li>Enforce state and federal regulatory compliance, operator log audits, and passenger safety protocols.</li>
+      </ul>
     </div>
+  </div>
+</div>
 
-    <script>
-        let websocket;
-        let audioContext;
-        let mediaStream;
-        let processor;
-        let isSetupComplete = false;
-        let nextPlayTime = 0;
+<script>
+// Update this if Google retires the model. Check Google's current Live API docs.
+const GEMINI_MODEL = "models/gemini-2.0-flash-exp";
+const INTERVIEWER_PROMPT = "You are a friendly resume interviewer. Speak in short, natural sentences. Ask about one job at a time: title, employer, dates, daily duties, tools used, and measurable results. Ask one question, then wait for the answer. Ask a follow-up for numbers (team size, percentages, dollar amounts) when the person gives vague answers.";
 
-        function logMessage(msg) {
-            const logBox = document.getElementById('interview-log');
-            logBox.innerHTML += `<br>> ${msg}`;
-            logBox.scrollTop = logBox.scrollHeight;
+let websocket, audioContext, mediaStream, processor;
+let isSetupComplete = false;
+let nextPlayTime = 0;
+let polishing = false;
+
+function logMessage(msg) {
+  const box = document.getElementById('interview-log');
+  box.appendChild(document.createElement('br'));
+  box.appendChild(document.createTextNode('> ' + msg));
+  box.scrollTop = box.scrollHeight;
+}
+
+function setUi(active) {
+  const btn = document.getElementById('start-interview-btn');
+  btn.innerText = active ? "End Interview & Polish Resume" : "Start Voice Interview";
+  btn.style.backgroundColor = active ? "#ef4444" : "";
+  document.getElementById('status').textContent = active ? "● SESSION LIVE" : "● SESSION STANDBY";
+}
+
+function stopSession() {
+  isSetupComplete = false;
+  if (processor) { processor.disconnect(); processor.onaudioprocess = null; processor = null; }
+  if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+  if (audioContext && audioContext.state !== 'closed') audioContext.close().catch(console.error);
+  setUi(false);
+}
+
+function playAudioChunk(base64Audio) {
+  try {
+    if (!audioContext || audioContext.state === 'closed') return;
+    const bin = atob(base64Audio);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const int16 = new Int16Array(bytes.buffer);
+    const f32 = new Float32Array(int16.length);
+    for (let i = 0; i < int16.length; i++) f32[i] = int16[i] / 32768;
+    const buf = audioContext.createBuffer(1, f32.length, 24000);
+    buf.getChannelData(0).set(f32);
+    const src = audioContext.createBufferSource();
+    src.buffer = buf;
+    src.connect(audioContext.destination);
+    const now = audioContext.currentTime;
+    if (nextPlayTime < now) nextPlayTime = now;
+    src.start(nextPlayTime);
+    nextPlayTime += buf.duration;
+  } catch (e) { console.error("Audio playback error:", e); }
+}
+
+async function startInterview() {
+  if (polishing) return;
+
+  if (websocket && websocket.readyState === WebSocket.OPEN) {
+    websocket.close(1000, "done");
+    stopSession();
+    logMessage("Interview completed. Polishing summary...");
+    await polishResume();
+    return;
+  }
+
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    const source = audioContext.createMediaStreamSource(mediaStream);
+    processor = audioContext.createScriptProcessor(4096, 1, 1);
+    source.connect(processor);
+    processor.connect(audioContext.destination);
+
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    websocket = new WebSocket(`${proto}//${location.host}/api/voice`);
+
+    websocket.onopen = () => {
+      isSetupComplete = false;
+      nextPlayTime = 0;
+      logMessage("Connected to server. Starting session...");
+      setUi(true);
+      websocket.send(JSON.stringify({
+        setup: {
+          model: GEMINI_MODEL,
+          generationConfig: { responseModalities: ["AUDIO"] },
+          systemInstruction: { parts: [{ text: INTERVIEWER_PROMPT }] }
         }
+      }));
+    };
 
-        function playAudioChunk(base64Audio) {
-            try {
-                if (!audioContext || audioContext.state === 'closed') return;
-                
-                const binaryString = atob(base64Audio);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
-                
-                const int16Array = new Int16Array(bytes.buffer);
-                const float32Array = new Float32Array(int16Array.length);
-                for (let i = 0; i < int16Array.length; i++) {
-                    float32Array[i] = int16Array[i] / 32768.0;
-                }
+    websocket.onclose = (e) => {
+      logMessage(`Session closed (code ${e.code}${e.reason ? ': ' + e.reason : ''}).`);
+      stopSession();
+    };
 
-                const audioBuffer = audioContext.createBuffer(1, float32Array.length, 24000);
-                audioBuffer.getChannelData(0).set(float32Array);
-
-                const source = audioContext.createBufferSource();
-                source.buffer = audioBuffer;
-                source.connect(audioContext.destination);
-
-                const currentTime = audioContext.currentTime;
-                if (nextPlayTime < currentTime) nextPlayTime = currentTime;
-                source.start(nextPlayTime);
-                nextPlayTime += audioBuffer.duration;
-            } catch (e) {
-                console.error("Audio playback error:", e);
-            }
+    websocket.onmessage = async (event) => {
+      try {
+        const raw = typeof event.data === 'string' ? event.data : await event.data.text();
+        const res = JSON.parse(raw);
+        if (res.setupComplete) {
+          isSetupComplete = true;
+          logMessage("Voice AI ready. Say hello!");
+        } else if (res.serverContent && res.serverContent.modelTurn) {
+          for (const part of res.serverContent.modelTurn.parts || []) {
+            if (part.inlineData && part.inlineData.data) playAudioChunk(part.inlineData.data);
+          }
+        } else if (res.error) {
+          logMessage("Voice AI error: " + (res.error.message || JSON.stringify(res.error)));
         }
+      } catch (err) {
+        logMessage("Could not read a server message: " + err.message);
+      }
+    };
 
-        async function startInterview() {
-            const btn = document.getElementById('start-interview-btn');
-            
-            if (websocket && websocket.readyState === WebSocket.OPEN) {
-                websocket.close();
-                if (audioContext && audioContext.state !== 'closed') {
-                    audioContext.close().catch(console.error);
-                }
-                if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
-                
-                btn.innerText = "Start Voice Interview";
-                btn.style.backgroundColor = "var(--accent-blue)";
-                logMessage("Interview completed. Autonomously polishing executive STAR bullets...");
-                
-                await polishResume();
-                return;
-            }
+    websocket.onerror = () => logMessage("Connection error. Check that /api/voice is deployed and GEMINI_API_KEY is set.");
 
-            try {
-                mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-                const source = audioContext.createMediaStreamSource(mediaStream);
-                
-                processor = audioContext.createScriptProcessor(4096, 1, 1);
-                source.connect(processor);
-                processor.connect(audioContext.destination);
+    processor.onaudioprocess = (e) => {
+      if (!(websocket && websocket.readyState === WebSocket.OPEN && isSetupComplete)) return;
+      const input = e.inputBuffer.getChannelData(0);
+      const buffer = new ArrayBuffer(input.length * 2);
+      const view = new DataView(buffer);
+      for (let i = 0; i < input.length; i++) {
+        view.setInt16(i * 2, Math.max(-1, Math.min(1, input[i])) * 0x7FFF, true);
+      }
+      const base64Audio = btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
+      websocket.send(JSON.stringify({
+        realtimeInput: { mediaChunks: [{ mimeType: "audio/pcm;rate=16000", data: base64Audio }] }
+      }));
+    };
+  } catch (err) {
+    logMessage("Microphone error: " + err.message);
+    stopSession();
+  }
+}
 
-                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const wsUrl = `${protocol}//${window.location.host}/api/voice`;
-                websocket = new WebSocket(wsUrl);
-
-                websocket.onopen = () => {
-                    isSetupComplete = false;
-                    nextPlayTime = 0;
-                    logMessage("WebSocket connected. Sending setup payload...");
-                    btn.innerText = "End Interview & Polish Resume";
-                    btn.style.backgroundColor = "#ef4444"; 
-                    
-                    const setupMessage = {
-                        setup: {
-                            model: "models/gemini-2.0-flash-exp",
-                            generationConfig: { 
-                                responseModalities: ["AUDIO"] 
-                            }
-                        }
-                    };
-                    websocket.send(JSON.stringify(setupMessage));
-                };
-
-                websocket.onclose = (event) => {
-                    isSetupComplete = false;
-                    btn.innerText = "Start Voice Interview";
-                    btn.style.backgroundColor = "var(--accent-blue)";
-                    logMessage(`Session disconnected by server. (Code: ${event.code})`);
-                    if (audioContext && audioContext.state !== 'closed') {
-                        audioContext.close().catch(console.error);
-                    }
-                    if(mediaStream) mediaStream.getTracks().forEach(track => track.stop());
-                };
-
-                websocket.onmessage = (event) => {
-                    const response = JSON.parse(event.data);
-                    
-                    if (response.setupComplete) {
-                        isSetupComplete = true;
-                        logMessage("Google AI connected and ready. Say hello!");
-                    } else if (response.serverContent && response.serverContent.modelTurn) {
-                        const parts = response.serverContent.modelTurn.parts;
-                        for (const part of parts) {
-                            if (part.inlineData && part.inlineData.data) {
-                                playAudioChunk(part.inlineData.data);
-                            }
-                        }
-                    }
-                };
-
-                websocket.onerror = (error) => {
-                    logMessage(`WebSocket Error. Verify proxy connection.`);
-                };
-
-                processor.onaudioprocess = (e) => {
-                    if (websocket && websocket.readyState === WebSocket.OPEN && isSetupComplete) {
-                        const inputData = e.inputBuffer.getChannelData(0);
-                        const pcmData = new Int16Array(inputData.length);
-                        for (let i = 0; i < inputData.length; i++) {
-                            pcmData[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7FFF;
-                        }
-                        
-                        const buffer = new ArrayBuffer(pcmData.length * 2);
-                        const view = new DataView(buffer);
-                        for (let i = 0; i < pcmData.length; i++) {
-                            view.setInt16(i * 2, pcmData[i], true); 
-                        }
-                        const base64Audio = btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
-
-                        const audioPayload = {
-                            realtimeInput: {
-                                mediaChunks: [{
-                                    mimeType: "audio/pcm;rate=16000",
-                                    data: base64Audio
-                                }]
-                            }
-                        };
-                        websocket.send(JSON.stringify(audioPayload));
-                    }
-                };
-
-            } catch (err) {
-                logMessage(`Microphone access denied: ${err.message}`);
-            }
-        }
-
-        async function polishResume() {
-            logMessage("Connecting to Cloudflare Backend (Claude 3.5 Sonnet)...");
-            
-            try {
-                const response = await fetch('/api/polish-resume', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        jobRole: "Transit Systems Analyst",
-                        schedule: document.getElementById("scheduleAvailability").value,
-                        workArrangement: document.getElementById("workArrangement").value
-                    })
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    document.getElementById("resume-summary").innerHTML = data.summary || "Dynamically updated summary highlighting technical systems analysis and dispatch operations...";
-                    logMessage("Resume successfully polished and updated on canvas.");
-                } else {
-                    logMessage("Backend polish successful (Simulation Mode).");
-                    document.getElementById("resume-summary").innerHTML = "Results-driven Transit Systems Analyst leveraging expertise in enterprise logistics, routing algorithms, and scheduling software to optimize fleet performance. Proven ability to bridge technical dispatch protocols with strict state/federal compliance standards.";
-                }
-            } catch (err) {
-                logMessage("Error communicating with backend. Check Anthropic API key in Cloudflare.");
-            }
-        }
-    </script>
+async function polishResume() {
+  const btn = document.getElementById('start-interview-btn');
+  polishing = true;
+  btn.disabled = true;
+  logMessage("Asking Claude to write your summary...");
+  const jobRole = document.getElementById('targetRoles').value.split(',')[0].trim() || "Transit Systems Analyst";
+  try {
+    const response = await fetch('/api/polish-resume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jobRole,
+        schedule: document.getElementById('scheduleAvailability').value,
+        workArrangement: document.getElementById('workArrangement').value
+      })
+    });
+    if (response.ok) {
+      const data = await response.json();
+      if (data.summary) {
+        document.getElementById('resume-summary').textContent = data.summary;
+        logMessage("Resume summary updated.");
+      } else {
+        logMessage("The server returned no summary. Resume unchanged.");
+      }
+    } else {
+      logMessage(`Summary request failed (HTTP ${response.status}). Resume unchanged.`);
+    }
+  } catch (err) {
+    logMessage("Could not reach the server: " + err.message);
+  } finally {
+    polishing = false;
+    btn.disabled = false;
+  }
+}
+</script>
 </body>
 </html>
