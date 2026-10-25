@@ -270,7 +270,8 @@ async function startInterview() {
       try {
         const raw = typeof event.data === 'string' ? event.data : await event.data.text();
         const res = JSON.parse(raw);
-        if (!res.setupComplete && !res.toolCall && !res.serverContent) logMessage("Google sent: " + raw.slice(0, 200));
+        if (res.debug) logMessage("Server: " + res.debug);
+        else if (!res.setupComplete && !res.toolCall && !res.serverContent) logMessage("Google sent: " + raw.slice(0, 200));
         if (res.setupComplete) {
           isSetupComplete = true;
           logMessage("Voice AI ready. Say hello!");
