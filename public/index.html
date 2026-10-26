@@ -41,6 +41,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.btn-primary:foc
 .resume-canvas ul{margin:0;padding-left:20px;font-size:13px;line-height:1.5}
 #r-summary,#r-skills,#r-edu{font-size:13px;line-height:1.5;white-space:pre-line;margin:0}
 .ph,.ph *{color:#9ca3af!important;font-style:italic}
+.mail-address{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:#fff;background:#111827;border:1px solid var(--border-color);border-radius:6px;padding:6px 8px;margin:6px 0;word-break:break-all}
 .flash{animation:flash 1.2s ease-out}
 @keyframes flash{from{background:#dbeafe}to{background:transparent}}
 @media (max-width:800px){
@@ -145,6 +146,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.btn-primary:foc
   <div class="queue-pane" id="inbox-pane" hidden>
     <div class="queue-status" id="inbox-status"></div>
     <div class="chip" id="inbox-setup" hidden></div>
+    <div class="chip" id="inbox-address" hidden></div>
     <div class="job-actions" id="inbox-actions"></div>
     <div id="inbox-list"></div>
   </div>
@@ -571,8 +573,8 @@ function showPane(name) {
   $('resume-content').hidden = name !== 'resume';
   $('queue-pane').hidden = name !== 'queue';
   $('inbox-pane').hidden = name !== 'inbox';
-  $('pane-hint').textContent = name === 'queue' ? 'Review before sending' : name === 'inbox' ? 'Reads mail, writes drafts' : 'Updated as you talk';
-  if (name === 'inbox' && !INBOX.loaded) inboxRefresh();
+  $('pane-hint').textContent = name === 'queue' ? 'Review before sending' : name === 'inbox' ? 'Forwarded mail, drafted replies' : 'Updated as you talk';
+  if (name === 'inbox' && !MAIL.loaded) mailRefresh();
 }
 function kitBlock(item) {
   const k = item.kit;
@@ -665,112 +667,103 @@ $('scanBtn').onclick = scanJobs;
 $('docJobBtn').onclick = addFromDocuments;
 renderQueue();
 
-// ---------- Inbox ----------
-const INBOX = { loaded: false, configured: false, connected: false, account: '', redirect_uri: '', needs: [], messages: [], statusText: '' };
-const DRAFT_LINK = 'https://mail.google.com/mail/u/0/#drafts';
-function inboxStatus(msg) {
-  INBOX.statusText = msg;
+// ---------- Mail (forwarded inbox, no OAuth) ----------
+const MAIL = { token: '', loaded: false, configured: false, address: '', needs: [], messages: [], statusText: '' };
+const MAIL_KEY = 'cc.mail.token.v1';
+const MAIL_TOKEN_RE = /^[a-z0-9]{16,40}$/;
+
+function mailStatus(msg) {
+  MAIL.statusText = msg;
   const el = $('inbox-status');
   if (el) el.textContent = msg;
 }
-async function inboxRefresh() {
-  INBOX.loaded = true;
-  try {
-    const r = await fetch('/api/inbox');
-    const raw = await r.text();
-    let d = {};
-    try { d = JSON.parse(raw); } catch (_) {}
-    if (r.ok) {
-      INBOX.configured = Boolean(d.configured);
-      INBOX.connected = Boolean(d.connected);
-      INBOX.account = d.account || '';
-      INBOX.redirect_uri = d.redirect_uri || '';
-      INBOX.needs = d.needs || [];
-    } else {
-      INBOX.configured = false;
-      INBOX.needs = [d.error || `HTTP ${r.status}`];
-    }
-  } catch (err) {
-    INBOX.configured = false;
-    INBOX.needs = ['the inbox endpoint could not be reached: ' + err.message];
+function mailToken() {
+  if (MAIL.token) return MAIL.token;
+  let t = '';
+  try { t = localStorage.getItem(MAIL_KEY) || ''; } catch (_) {}
+  if (!MAIL_TOKEN_RE.test(t)) {
+    t = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+      .map(b => b.toString(36).padStart(2, '0')).join('').slice(0, 24).toLowerCase();
+    try { localStorage.setItem(MAIL_KEY, t); } catch (_) {}
   }
-  renderInbox();
+  MAIL.token = t;
+  return t;
 }
-async function inboxScan() {
-  const btn = $('inbox-scan');
-  if (btn) btn.disabled = true;
-  inboxStatus('Reading your inbox ...');
+async function mailApi(method, body) {
+  const headers = { 'x-mailbox-token': mailToken() };
+  if (body) headers['Content-Type'] = 'application/json';
+  const r = await fetch('/api/mailbox', { method, headers, body: body ? JSON.stringify(body) : undefined });
+  const raw = await r.text();
+  let d = {};
+  try { d = JSON.parse(raw); } catch (_) {}
+  if (!r.ok) throw new Error(d.error || `HTTP ${r.status} ${raw.slice(0, 160)}`);
+  return d;
+}
+function applyMail(d) {
+  if (typeof d.configured === 'boolean') MAIL.configured = d.configured;
+  if (d.address) MAIL.address = d.address;
+  MAIL.needs = d.needs || [];
+  if (Array.isArray(d.messages)) MAIL.messages = d.messages;
+}
+async function mailRefresh() {
+  MAIL.loaded = true;
+  try { applyMail(await mailApi('GET')); }
+  catch (err) { MAIL.configured = false; MAIL.needs = [err.message]; }
+  if (!MAIL.statusText) mailStatus(MAIL.messages.length
+    ? `${MAIL.messages.length} message${MAIL.messages.length === 1 ? '' : 's'} in this mailbox.`
+    : 'Forward a job email to your address and it lands here.');
+  renderMail();
+}
+async function mailSort() {
+  const pending = MAIL.messages.filter(m => !m.classified).length;
+  if (!pending) return mailStatus('Everything here is already sorted.');
+  mailStatus(`Sorting ${Math.min(pending, 10)} message${pending === 1 ? '' : 's'} with Claude ...`);
   try {
-    const r = await fetch('/api/inbox', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'scan' }) });
-    const raw = await r.text();
-    let d = {};
-    try { d = JSON.parse(raw); } catch (_) {}
-    if (!r.ok) throw new Error(d.error || `HTTP ${r.status} ${raw.slice(0, 140)}`);
-    INBOX.messages = d.messages || [];
-    inboxStatus(d.note || `Found ${INBOX.messages.length} job-related message${INBOX.messages.length === 1 ? '' : 's'}.`);
-  } catch (err) {
-    inboxStatus(`Could not read the inbox: ${err.message}`);
-  }
-  if (btn) btn.disabled = false;
-  renderInbox();
+    const d = await mailApi('POST', { action: 'classify' });
+    applyMail(d);
+    mailStatus(d.sorted ? `Sorted ${d.sorted} message${d.sorted === 1 ? '' : 's'}.` : 'Nothing left to sort.');
+  } catch (err) { mailStatus(`Could not sort: ${err.message}`); }
+  renderMail();
 }
-async function inboxDraft(id) {
-  const item = INBOX.messages.find(m => m.id === id);
+async function mailDraft(id) {
+  const item = MAIL.messages.find(m => m.id === id);
   if (!item) return;
   const field = document.getElementById('intent-' + id);
   const intent = field ? field.value.trim() : '';
-  inboxStatus('Drafting a reply ...');
+  mailStatus('Drafting a reply ...');
   try {
-    const r = await fetch('/api/inbox', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'draft', id, intent, resume: { name: R.name, title: R.title, summary: R.summary } })
-    });
-    const raw = await r.text();
-    let d = {};
-    try { d = JSON.parse(raw); } catch (_) {}
-    if (!r.ok) throw new Error(d.error || `HTTP ${r.status} ${raw.slice(0, 140)}`);
+    const d = await mailApi('POST', { action: 'draft', id, intent, resume: { name: R.name, title: R.title, summary: R.summary } });
     item.draft = d.draft;
-    inboxStatus(d.note || 'Reply saved to your Gmail drafts.');
-  } catch (err) {
-    inboxStatus(`Could not draft the reply: ${err.message}`);
-  }
-  renderInbox();
+    mailStatus(d.note || 'Draft ready. Nothing was sent.');
+  } catch (err) { mailStatus(`Could not draft the reply: ${err.message}`); }
+  renderMail();
 }
-async function inboxDisconnect() {
-  try { await fetch('/api/inbox', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'disconnect' }) }); } catch (_) {}
-  INBOX.messages = [];
-  INBOX.connected = false;
-  INBOX.account = '';
-  inboxStatus('Mailbox disconnected. The stored token was deleted from this browser.');
-  inboxRefresh();
+async function mailDelete(id) {
+  try { applyMail(await mailApi('POST', { action: 'delete', id })); mailStatus('Message deleted.'); }
+  catch (err) { mailStatus(`Could not delete: ${err.message}`); }
+  renderMail();
 }
-function renderInbox() {
-  const list = $('inbox-list');
+async function mailClear() {
+  if (!confirm('Delete every message in this mailbox? This cannot be undone.')) return;
+  try { applyMail(await mailApi('POST', { action: 'clear' })); MAIL.messages = []; mailStatus('Mailbox emptied.'); }
+  catch (err) { mailStatus(`Could not clear the mailbox: ${err.message}`); }
+  renderMail();
+}
+async function mailCopy(text, what) {
+  try { await navigator.clipboard.writeText(text); mailStatus(`${what} copied.`);
+  } catch (_) { mailStatus(`Copy was blocked by the browser; select the ${what.toLowerCase()} text instead.`); }
+}
+function mailtoHref(draft) {
+  return 'mailto:' + encodeURIComponent(draft.to || '') +
+    '?subject=' + encodeURIComponent(draft.subject || '') +
+    '&body=' + encodeURIComponent((draft.body || '').slice(0, 1800));
+}
+function renderMail() {
+  const list = $('inbox-list'), setup = $('inbox-setup'), addr = $('inbox-address'), actions = $('inbox-actions');
   if (!list) return;
-  const setup = $('inbox-setup');
-  const actions = $('inbox-actions');
-  list.replaceChildren();
-  actions.replaceChildren();
-  $('inbox-count').textContent = INBOX.messages.length ? String(INBOX.messages.length) : '·';
-
-  if (!INBOX.configured) {
-    setup.hidden = false;
-    const missing = INBOX.needs.length ? INBOX.needs.join(', ') : 'GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET';
-    setup.textContent = `Needs ${missing} set in the Pages project. Add this exact redirect URI to your Google Cloud OAuth client: ${INBOX.redirect_uri || location.origin + '/api/inbox'}`;
-    if (!INBOX.statusText) inboxStatus('Not configured yet.');
-    return;
-  }
-  setup.hidden = true;
-
-  if (!INBOX.connected) {
-    const b = document.createElement('button');
-    b.className = 'btn-sm primary';
-    b.textContent = 'Connect Gmail';
-    b.onclick = () => { location.href = '/api/inbox?connect=1&return=' + encodeURIComponent(location.pathname); };
-    actions.append(b);
-    if (!INBOX.statusText) inboxStatus('Not connected. Access is read + draft only, granted by Google, and can be revoked any time.');
-    return;
-  }
+  list.replaceChildren(); actions.replaceChildren(); addr.replaceChildren();
+  addr.hidden = true;
+  $('inbox-count').textContent = MAIL.messages.length ? String(MAIL.messages.length) : '·';
 
   const mk = (label, cls, fn, disabled) => {
     const b = document.createElement('button');
@@ -780,23 +773,40 @@ function renderInbox() {
     b.onclick = fn;
     return b;
   };
-  const scan = mk('Scan inbox', 'primary', inboxScan, false);
-  scan.id = 'inbox-scan';
-  actions.append(scan);
-  actions.append(mk('Disconnect', '', inboxDisconnect, false));
-  if (!INBOX.statusText) {
-    inboxStatus(`${INBOX.account ? 'Connected as ' + INBOX.account : 'Connected'} · ${INBOX.messages.length} message${INBOX.messages.length === 1 ? '' : 's'} loaded.`);
+
+  if (!MAIL.configured) {
+    setup.hidden = false;
+    const missing = MAIL.needs.length ? MAIL.needs.join(', ') : 'MAIL_DB, INBOUND_SECRET, INBOUND_ADDRESS';
+    setup.textContent = `Forwarding needs ${missing} set in the Pages project. INBOUND_ADDRESS is the receiving address your mail provider gives you (for example your-hash@inbound.postmarkapp.com); point its inbound webhook at ${location.origin}/api/inbound?key=<INBOUND_SECRET>, then redeploy.`;
+    if (!MAIL.statusText) mailStatus('Not wired up yet.');
+    return;
+  }
+  setup.hidden = true;
+
+  if (MAIL.address) {
+    addr.hidden = false;
+    const label = document.createElement('div');
+    label.textContent = 'Your private forwarding address. Forward job mail to it, then press Check mail.';
+    const value = document.createElement('div');
+    value.className = 'mail-address';
+    value.textContent = MAIL.address;
+    addr.append(label, value, mk('Copy address', '', () => mailCopy(MAIL.address, 'Address'), false));
   }
 
-  if (!INBOX.messages.length) {
+  actions.append(mk('Check mail', 'primary', mailRefresh, false));
+  const unsorted = MAIL.messages.filter(m => !m.classified).length;
+  actions.append(mk(unsorted ? `Sort ${unsorted} with AI` : 'Sort with AI', '', mailSort, unsorted === 0));
+  if (MAIL.messages.length) actions.append(mk('Delete all', '', mailClear, false));
+
+  if (!MAIL.messages.length) {
     const p = document.createElement('div');
     p.className = 'queue-empty';
-    p.textContent = 'Scan to pull interview requests, recruiter notes and application updates from the last 45 days.';
+    p.textContent = 'Nothing forwarded yet. Interview requests, recruiter notes and application updates sent to your private address will appear here, sorted by what they need from you.';
     list.append(p);
     return;
   }
 
-  for (const m of INBOX.messages) {
+  for (const m of MAIL.messages) {
     const card = document.createElement('div');
     card.className = 'job-card';
 
@@ -804,7 +814,7 @@ function renderInbox() {
     h.textContent = m.subject || '(no subject)';
     const badge = document.createElement('span');
     badge.className = 'badge ' + (m.kind === 'interview' || m.kind === 'offer' ? 'ready' : m.kind === 'rejection' ? 'skipped' : '');
-    badge.textContent = String(m.kind || 'other').replace('_', ' ');
+    badge.textContent = String(m.kind || 'unsorted').replace('_', ' ');
     h.append(badge);
 
     const sub = document.createElement('div');
@@ -813,7 +823,7 @@ function renderInbox() {
 
     const summary = document.createElement('div');
     summary.className = 'job-sub';
-    summary.textContent = m.summary || '';
+    summary.textContent = m.summary || m.snippet || '';
 
     card.append(h, sub, summary);
 
@@ -827,31 +837,37 @@ function renderInbox() {
       field.setAttribute('aria-label', 'What the reply should say');
       field.style.flex = '1 1 220px';
       wrap.append(field);
-      wrap.append(mk('Draft reply', 'primary', () => inboxDraft(m.id), false));
+      wrap.append(mk('Draft reply', 'primary', () => mailDraft(m.id), false));
       card.append(wrap);
     }
 
     if (m.draft) {
       const kit = document.createElement('div');
       kit.className = 'kit';
-      const l1 = document.createElement('div'); l1.className = 'kit-label'; l1.textContent = 'Draft to ' + m.draft.to;
-      const s1 = document.createElement('pre'); s1.textContent = m.draft.subject;
-      const l2 = document.createElement('div'); l2.className = 'kit-label'; l2.textContent = 'Saved in Gmail drafts (not sent)';
-      const s2 = document.createElement('pre'); s2.textContent = m.draft.body;
-      const link = document.createElement('a');
-      link.className = 'btn-sm';
-      link.href = DRAFT_LINK;
-      link.target = '_blank';
-      link.rel = 'noopener';
-      link.textContent = 'Open Gmail drafts';
-      kit.append(l1, s1, l2, s2, link);
+      const l1 = document.createElement('div'); l1.className = 'kit-label'; l1.textContent = 'To ' + (m.draft.to || 'the sender');
+      const s1 = document.createElement('pre'); s1.textContent = m.draft.subject || '';
+      const l2 = document.createElement('div'); l2.className = 'kit-label'; l2.textContent = 'Reply draft — not sent';
+      const s2 = document.createElement('pre'); s2.textContent = m.draft.body || '';
+      const row = document.createElement('div');
+      row.className = 'job-actions';
+      const a = document.createElement('a');
+      a.className = 'btn-sm';
+      a.href = mailtoHref(m.draft);
+      a.textContent = 'Open in mail app';
+      row.append(mk('Copy reply', '', () => mailCopy(`${m.draft.subject || ''}\n\n${m.draft.body || ''}`, 'Reply'), false), a);
+      kit.append(l1, s1, l2, s2, row);
       card.append(kit);
     }
+
+    const foot = document.createElement('div');
+    foot.className = 'job-actions';
+    foot.append(mk('Delete', '', () => mailDelete(m.id), false));
+    card.append(foot);
     list.append(card);
   }
 }
 if (new URLSearchParams(location.search).get('inbox')) showPane('inbox');
-inboxRefresh();
+mailRefresh();
 </script>
 </body>
 </html>
