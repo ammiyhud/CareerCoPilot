@@ -235,6 +235,10 @@ function playAudioChunk(base64Audio) {
 
 async function startInterview() {
   if (polishing) return;
+  if (websocket && websocket.readyState === WebSocket.CONNECTING) {
+    logMessage("Still connecting. Please wait a few seconds.");
+    return;
+  }
   if (websocket && websocket.readyState === WebSocket.OPEN) {
     websocket.close(1000, "done");
     stopSession();
