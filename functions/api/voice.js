@@ -10,8 +10,11 @@ function safeCode(code) {
 }
 
 // Gemini may send JSON as binary frames; the browser code expects text.
-function toText(data) {
-    return typeof data === 'string' ? data : new TextDecoder().decode(data);
+async function toText(data) {
+    if (typeof data === 'string') return data;
+    if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) return new TextDecoder().decode(data);
+    if (data && typeof data.text === 'function') return await data.text(); // Blob
+    return String(data);
 }
 
 // Temporary diagnostic: /api/voice?test=1[&via=fetch|header|ctor][&model=...]
@@ -53,7 +56,7 @@ async function runLiveTest(request, env) {
     }
 
     await new Promise((resolve) => {
-        ws.addEventListener('message', (e) => mark({ message: clean(toText(e.data)) }));
+        ws.addEventListener('message', async (e) => mark({ message: clean(await toText(e.data)) }));
         ws.addEventListener('close', (e) => { mark({ closed: { code: e.code, reason: clean(e.reason || '') } }); resolve(); });
         ws.addEventListener('error', (e) => { mark({ error: clean(e.message || 'socket error') }); resolve(); });
         const send = () => {
@@ -109,9 +112,12 @@ export async function onRequest(context) {
         if (fromClient++ === 0) note('Proxy got your setup message and sent it to Google.');
         try { gemini.send(e.data); } catch (_) {}
     });
+    let chain = Promise.resolve(); // keeps Google's messages in order
     gemini.addEventListener('message', (e) => {
         fromGoogle++;
-        try { server.send(toText(e.data)); } catch (_) {}
+        chain = chain.then(async () => {
+            try { server.send(await toText(e.data)); } catch (_) {}
+        });
     });
     setTimeout(() => {
         if (fromGoogle === 0) note(`Google has sent nothing back after 6 seconds (messages from you: ${fromClient}).`);
