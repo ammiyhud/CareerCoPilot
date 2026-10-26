@@ -51,6 +51,32 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.btn-primary:foc
   .experience-header{flex-direction:column;gap:2px}
   .row{flex-direction:column;gap:0}
 }
+
+[hidden]{display:none!important}
+.tabs{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.tab{background:transparent;border:1px solid var(--border-color);color:var(--text-secondary);border-radius:6px;padding:5px 9px;font:inherit;font-size:11px;text-transform:uppercase;letter-spacing:1px;cursor:pointer}
+.tab.active{background:#1f2937;color:var(--text-primary);border-color:#374151}
+.queue-pane{flex-grow:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
+#queue-list{display:flex;flex-direction:column;gap:10px}
+.queue-empty{color:var(--text-secondary);font-size:13px;padding:16px 4px}
+.queue-status{font-size:12px;color:var(--text-secondary);min-height:16px}
+.job-card{border:1px solid var(--border-color);border-radius:8px;padding:12px;background:#0b0f19}
+.job-card h3{margin:0 0 4px;font-size:14px;font-weight:600;line-height:1.35}
+.job-sub{font-size:12px;color:var(--text-secondary);margin-bottom:8px;word-break:break-word}
+.job-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.btn-sm{background:#1f2937;color:var(--text-primary);border:1px solid #374151;border-radius:6px;padding:5px 9px;font-size:12px;cursor:pointer;text-decoration:none;font-family:inherit}
+.btn-sm:hover{background:#374151}
+.btn-sm.primary{background:var(--accent-blue);border-color:var(--accent-blue)}
+.btn-sm:disabled{opacity:.55;cursor:wait}
+.badge{display:inline-block;font-size:10px;text-transform:uppercase;letter-spacing:1px;border-radius:999px;padding:2px 7px;border:1px solid var(--border-color);color:var(--text-secondary);margin-left:6px;vertical-align:middle;font-weight:normal}
+.badge.ready{color:#a7f3d0;border-color:#065f46}
+.badge.sent{color:#93c5fd;border-color:#1d4ed8}
+.badge.busy{color:#fcd34d;border-color:#92400e}
+.kit{border-top:1px solid var(--border-color);margin-top:10px;padding-top:10px;font-size:12px;line-height:1.5}
+.kit pre{white-space:pre-wrap;font-family:inherit;margin:4px 0 8px;color:#d1d5db}
+.kit-label{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text-secondary)}
+.pill{display:inline-block;font-size:11px;border:1px solid var(--border-color);border-radius:999px;padding:2px 8px;margin:3px 4px 0 0;color:var(--text-secondary)}
+.hint{font-size:11px;color:var(--text-secondary);margin-top:6px;line-height:1.45}
 </style>
 </head>
 <body>
@@ -82,10 +108,24 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.btn-primary:foc
     <div class="input-group"><label for="scheduleAvailability">Schedule Availability</label><input type="text" id="scheduleAvailability" value="1:30 AM to 3:00 PM"></div>
     <div class="input-group"><label for="jobUrl">Test Hybrid Dispatcher (Paste Job Posting URL)</label><input type="text" id="jobUrl" value="https://boards.greenhouse.io/..."></div>
   </div>
+  <div class="panel">
+    <div class="header-bar"><span>⚡ AUTO APPLY</span><span>You review, you send</span></div>
+    <div class="input-group"><label for="boardUrls">Job board or posting URLs (one per line)</label><textarea id="boardUrls" rows="3" placeholder="https://boards.greenhouse.io/acme&#10;https://jobs.lever.co/acme&#10;https://jobs.ashbyhq.com/acme"></textarea></div>
+    <button class="btn-primary" id="scanBtn">Scan for matching jobs</button>
+    <button class="btn-primary" id="docJobBtn" style="margin-top:8px;background:#374151">Add the job description from Documents</button>
+    <div class="chip" id="scanChip" style="margin-top:10px">Reads public Greenhouse, Lever and Ashby boards, or any single posting page. Applications are prepared here and sent from your own mailbox — nothing is submitted silently.</div>
+    <div class="hint" id="scan-status"></div>
+  </div>
 </div>
 
 <div class="right-column">
-  <div class="header-bar"><span>● LIVE RESUME CANVAS</span><span>Updated as you talk</span></div>
+    <div class="header-bar">
+    <span class="tabs">
+      <button class="tab active" data-pane="resume">● LIVE RESUME CANVAS</button>
+      <button class="tab" data-pane="queue">APPLICATIONS <span id="queue-count">0</span></button>
+    </span>
+    <span id="pane-hint">Updated as you talk</span>
+  </div>
   <div class="resume-canvas" id="resume-content">
     <div class="resume-header">
       <h1 class="resume-name" id="r-name"></h1>
@@ -96,6 +136,10 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.btn-primary:foc
     <div class="section-title">PROFESSIONAL EXPERIENCE</div><div id="r-exp"></div>
     <div class="section-title">SKILLS</div><p id="r-skills"></p>
     <div class="section-title">EDUCATION</div><p id="r-edu"></p>
+  </div>
+  <div class="queue-pane" id="queue-pane" hidden>
+    <div class="queue-status" id="queue-status"></div>
+    <div id="queue-list"></div>
   </div>
 </div>
 
@@ -358,6 +402,259 @@ async function polishResume() {
 }
 
 render();
+
+// ---------- Auto apply ----------
+const Q_KEY = 'cc.apply.queue.v1';
+let Q = [];
+try { Q = JSON.parse(localStorage.getItem(Q_KEY) || '[]') || []; } catch (_) { Q = []; }
+if (!Array.isArray(Q)) Q = [];
+
+function saveQ() { try { localStorage.setItem(Q_KEY, JSON.stringify(Q)); } catch (_) {} }
+function qStatus(msg) { const el = $('queue-status'); if (el) el.textContent = msg; const s = $('scan-status'); if (s) s.textContent = msg; }
+function rules() {
+  return {
+    roles: $('targetRoles').value.trim(),
+    salary: $('minSalary').value.trim(),
+    arrangement: $('workArrangement').value,
+    availability: $('scheduleAvailability').value.trim()
+  };
+}
+// A posting matches when it shares at least half the words of one target role.
+function matchesRoles(job) {
+  const roles = rules().roles.split(',').map(r => r.trim().toLowerCase()).filter(Boolean);
+  if (!roles.length) return true;
+  const hay = `${job.title || job.role || ''} ${job.summary || ''}`.toLowerCase();
+  return roles.some(role => {
+    const words = role.split(/\s+/).filter(w => w.length > 2);
+    if (!words.length) return true;
+    return words.filter(w => hay.includes(w)).length / words.length >= 0.5;
+  });
+}
+function newId() { return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'q' + Date.now() + Math.random().toString(36).slice(2, 8); }
+function addJobs(jobs) {
+  let added = 0;
+  for (const j of jobs) {
+    if (!j) continue;
+    const url = (j.url || '').trim();
+    if (url && Q.some(q => q.url === url)) continue;
+    if (!url && Q.some(q => q.title === j.title && q.company === j.company)) continue;
+    Q.push({
+      id: newId(),
+      title: j.title || j.role || 'Untitled role',
+      company: j.company || '',
+      location: j.location || '',
+      url,
+      apply_email: j.apply_email || '',
+      summary: j.summary || '',
+      requirements: Array.isArray(j.requirements) ? j.requirements : [],
+      status: 'new',
+      kit: null
+    });
+    added++;
+  }
+  if (added) { saveQ(); renderQueue(); }
+  return added;
+}
+async function scanJobs() {
+  const urls = $('boardUrls').value.split(/\s*\n\s*/).map(s => s.trim()).filter(Boolean);
+  if (!urls.length) return qStatus('Paste at least one job board or posting URL.');
+  const btn = $('scanBtn'); btn.disabled = true;
+  let found = 0, added = 0, skipped = 0, failures = 0;
+  for (const url of urls) {
+    qStatus(`Reading ${url} ...`);
+    try {
+      const r = await fetch('/api/jobs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+      const raw = await r.text();
+      let d = {};
+      try { d = JSON.parse(raw); } catch (_) {}
+      if (!r.ok) { failures++; qStatus(`${url}: ${d.error || `HTTP ${r.status} ${raw.slice(0, 120)}`}`); continue; }
+      const list = d.jobs || (d.job ? [d.job] : []);
+      found += list.length;
+      const keep = list.filter(matchesRoles);
+      skipped += list.length - keep.length;
+      added += addJobs(keep);
+      if (d.job) showPane('queue');
+    } catch (err) { failures++; qStatus(`${url}: ${err.message}`); }
+  }
+  btn.disabled = false;
+  qStatus(`Found ${found} posting${found === 1 ? '' : 's'}; queued ${added}${skipped ? `; skipped ${skipped} that did not match your target roles` : ''}${failures ? `; ${failures} URL${failures === 1 ? '' : 's'} could not be read` : ''}.`);
+}
+function addFromDocuments() {
+  const text = $('jobText').value.trim();
+  const url = $('jobUrl').value.trim();
+  const base = { url: /^https?:\/\//i.test(url) ? url : '', location: '', apply_email: '' };
+  let job = null;
+  if (JOB && (JOB.role || JOB.company)) {
+    job = { ...base, title: JOB.role || 'Role from job description', company: JOB.company || '', summary: JOB.summary || '', requirements: JOB.requirements || [] };
+  } else if (text) {
+    job = { ...base, title: 'Role from pasted description', summary: text.slice(0, 400), requirements: [] };
+  }
+  if (!job) return qStatus('Add a job description in the Documents panel first, or scan a board URL.');
+  addJobs([job]);
+  showPane('queue');
+  qStatus('Added to the queue. Prepare the kit when you are ready.');
+}
+async function prepareKit(id) {
+  const item = Q.find(q => q.id === id);
+  if (!item) return;
+  const previous = item.status;
+  item.status = 'busy'; renderQueue();
+  qStatus(`Writing the application kit for ${item.title} ...`);
+  try {
+    const r = await fetch('/api/apply-kit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resume: R, job: item, rules: rules() })
+    });
+    const raw = await r.text();
+    let d = {};
+    try { d = JSON.parse(raw); } catch (_) {}
+    if (!r.ok || !d.kit) throw new Error(d.error || `HTTP ${r.status} ${raw.slice(0, 120)}`);
+    item.kit = d.kit;
+    item.status = 'ready';
+    qStatus('Kit ready. Review the letter and email, then send it from your mailbox.');
+  } catch (err) {
+    item.status = previous === 'busy' ? 'new' : previous;
+    qStatus(`Could not write the kit: ${err.message}`);
+  }
+  saveQ(); renderQueue();
+}
+function packetText(item) {
+  const k = item.kit || {};
+  const lines = [
+    `${item.title}${item.company ? ' — ' + item.company : ''}`,
+    item.url || '',
+    '',
+    'COVER LETTER', k.cover_letter || '',
+    '',
+    'EMAIL SUBJECT', k.email_subject || '',
+    '',
+    'EMAIL BODY', k.email_body || ''
+  ];
+  if (k.keywords && k.keywords.length) lines.push('', 'MATCHED: ' + k.keywords.join(' | '));
+  if (k.gaps && k.gaps.length) lines.push('', 'QUESTIONS TO ANSWER: ' + k.gaps.join(' | '));
+  return lines.join('\n');
+}
+async function copyPacket(id) {
+  const item = Q.find(q => q.id === id);
+  if (!item) return;
+  try { await navigator.clipboard.writeText(packetText(item)); qStatus('Application packet copied — paste it into any form or email.'); }
+  catch (_) { qStatus('Copy was blocked by the browser; select the text in the card instead.'); }
+}
+function composeHref(item) {
+  const k = item.kit || {};
+  const subject = k.email_subject || `${item.title} application${R.name ? ' — ' + R.name : ''}`;
+  const body = k.email_body || '';
+  const to = item.apply_email || '';
+  if (!to) return 'mailto:?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+  return 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(to) +
+    '&su=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+}
+function setItemStatus(id, status) {
+  const item = Q.find(q => q.id === id);
+  if (!item) return;
+  item.status = status;
+  saveQ(); renderQueue();
+}
+function removeItem(id) {
+  Q = Q.filter(q => q.id !== id);
+  saveQ(); renderQueue();
+}
+function showPane(name) {
+  for (const b of document.querySelectorAll('.tab')) b.classList.toggle('active', b.dataset.pane === name);
+  $('resume-content').hidden = name !== 'resume';
+  $('queue-pane').hidden = name !== 'queue';
+  $('pane-hint').textContent = name === 'queue' ? 'Review before sending' : 'Updated as you talk';
+}
+function kitBlock(item) {
+  const k = item.kit;
+  const wrap = document.createElement('div');
+  wrap.className = 'kit';
+  const add = (label, text) => {
+    if (!text) return;
+    const l = document.createElement('div'); l.className = 'kit-label'; l.textContent = label;
+    const p = document.createElement('pre'); p.textContent = text;
+    wrap.append(l, p);
+  };
+  add('Cover letter', k.cover_letter);
+  add('Email subject', k.email_subject);
+  add('Email body', k.email_body);
+  if (k.keywords && k.keywords.length) {
+    const l = document.createElement('div'); l.className = 'kit-label'; l.textContent = 'Matched requirements';
+    const p = document.createElement('div');
+    for (const w of k.keywords) { const s = document.createElement('span'); s.className = 'pill'; s.textContent = w; p.append(s); }
+    wrap.append(l, p);
+  }
+  if (k.gaps && k.gaps.length) {
+    const l = document.createElement('div'); l.className = 'kit-label'; l.textContent = 'Answer these before sending';
+    const p = document.createElement('div');
+    for (const w of k.gaps) { const s = document.createElement('span'); s.className = 'pill'; s.textContent = w; p.append(s); }
+    wrap.append(l, p);
+  }
+  return wrap;
+}
+function renderQueue() {
+  const list = $('queue-list');
+  if (!list) return;
+  list.replaceChildren();
+  $('queue-count').textContent = String(Q.filter(q => q.status !== 'skipped').length);
+  if (!Q.length) {
+    const p = document.createElement('div');
+    p.className = 'queue-empty';
+    p.textContent = 'No jobs yet. Scan a job board, paste a posting URL, or add the job description from the Documents panel.';
+    list.append(p);
+    return;
+  }
+  for (const item of Q) {
+    const card = document.createElement('div');
+    card.className = 'job-card';
+
+    const h = document.createElement('h3');
+    h.textContent = item.title || item.url || 'Untitled role';
+    const badge = document.createElement('span');
+    badge.className = 'badge ' + item.status;
+    badge.textContent = item.status === 'busy' ? 'working' : item.status;
+    h.append(badge);
+
+    const sub = document.createElement('div');
+    sub.className = 'job-sub';
+    sub.textContent = [item.company, item.location, item.apply_email ? 'apply to ' + item.apply_email : 'no contact email found']
+      .filter(Boolean).join(' · ') || 'no company details';
+
+    const actions = document.createElement('div');
+    actions.className = 'job-actions';
+    const mk = (label, cls, fn, disabled) => {
+      const b = document.createElement('button');
+      b.className = 'btn-sm' + (cls ? ' ' + cls : '');
+      b.textContent = label;
+      if (disabled) b.disabled = true;
+      b.onclick = fn;
+      return b;
+    };
+    actions.append(mk(item.kit ? 'Rewrite kit' : 'Prepare kit', 'primary', () => prepareKit(item.id), item.status === 'busy'));
+    if (item.url) actions.append(mk('Open posting', '', () => window.open(item.url, '_blank', 'noopener')));
+    if (item.kit) {
+      actions.append(mk('Copy packet', '', () => copyPacket(item.id)));
+      const a = document.createElement('a');
+      a.className = 'btn-sm';
+      a.href = composeHref(item);
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = item.apply_email ? 'Email application' : 'Draft email';
+      actions.append(a);
+    }
+    actions.append(mk(item.status === 'sent' ? 'Applied ✓' : 'Mark applied', '', () => setItemStatus(item.id, item.status === 'sent' ? 'ready' : 'sent'), false));
+    actions.append(mk(item.status === 'skipped' ? 'Restore' : 'Skip', '', () => setItemStatus(item.id, item.status === 'skipped' ? 'new' : 'skipped'), false));
+    actions.append(mk('Remove', '', () => removeItem(item.id), false));
+
+    card.append(h, sub, actions);
+    if (item.kit) card.append(kitBlock(item));
+    list.append(card);
+  }
+}
+for (const b of document.querySelectorAll('.tab')) b.onclick = () => showPane(b.dataset.pane);
+$('scanBtn').onclick = scanJobs;
+$('docJobBtn').onclick = addFromDocuments;
+renderQueue();
 </script>
 </body>
 </html>
