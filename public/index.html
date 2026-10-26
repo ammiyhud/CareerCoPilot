@@ -223,10 +223,10 @@ async function runTests() {
   for (const t of tests) {
     logMessage('Test ' + (t || '(default)') + ' ... wait 7 seconds');
     try {
-      const r = await fetch('/api/Live-test' + t);
+      const r = await fetch('/api/voice?test=1' + (t ? '&' + t.slice(1) : ''));
       const txt = await r.text();
       let d;
-      try { d = JSON.parse(txt); } catch (_) { logMessage('Not the test page (HTTP ' + r.status + '). Live-test.js may not be deployed.'); break; }
+      try { d = JSON.parse(txt); } catch (_) { logMessage('Not the test page (HTTP ' + r.status + '). voice.js may still be an old version.'); break; }
       logMessage('Result: ' + JSON.stringify(d.events || d).slice(0, 500));
     } catch (e) { logMessage('Test failed: ' + e.message); }
   }
