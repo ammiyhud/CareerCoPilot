@@ -102,7 +102,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.btn-primary:foc
 <script>
 const GEMINI_MODEL = "models/gemini-2.5-flash-native-audio-latest";
 const USE_TOOLS = true; // set to false to test the voice interview without live resume updates
-const INTERVIEWER_PROMPT = "You are a friendly resume interviewer. Speak in short, natural sentences and ask ONE question at a time. Start by asking the candidate's name and the job they want. Then go through each past job: title, employer, location, dates, daily duties, tools, and measurable results (ask for numbers when answers are vague). Then ask about skills and education. After EVERY answer, call update_resume with the new facts. Include only facts the candidate actually said or that appear in the provided documents. Never invent employers, dates, or numbers. If you are given existing resume data or a job description, do not re-ask what is already known; use the job description to decide which questions matter most.";
+const INTERVIEWER_PROMPT = "You are a friendly resume interviewer. Speak in short, natural sentences and ask ONE question at a time. Start by asking the candidate's name, ask them to spell it letter by letter, read it back to confirm, then ask which job they want. Then go through each past job: title, employer, location, dates, daily duties, tools, and measurable results (ask for numbers when answers are vague). Then ask about skills and education. After EVERY answer, call update_resume with the new facts. Include only facts the candidate actually said or that appear in the provided documents. Never invent employers, dates, or numbers. If you are given existing resume data or a job description, do not re-ask what is already known; use the job description to decide which questions matter most.";
 const TOOLS = [{ functionDeclarations: [{
   name: "update_resume",
   description: "Save resume details the candidate just shared. Call after every answer. Only include facts the candidate stated.",
@@ -118,7 +118,7 @@ const $ = id => document.getElementById(id);
 let R = { name: "", title: "", contact: "", summary: "", experience: [], skills: [], education: [] };
 let JOB = null;
 let websocket, audioContext, mediaStream, processor;
-let isSetupComplete = false, nextPlayTime = 0, polishing = false;
+let isSetupComplete = false, nextPlayTime = 0, polishing = false, userEnded = false, retries = 0;
 
 function put(el, val, ph) { el.textContent = val || ph; el.classList.toggle('ph', !val); }
 function render() {
@@ -147,8 +147,11 @@ function applyUpdate(a) {
   for (const k of ['name', 'title', 'contact', 'summary']) if (typeof a[k] === 'string' && a[k].trim()) R[k] = a[k].trim();
   const j = a.job;
   if (j && (j.role || j.company)) {
-    const same = (x, y) => (x || '').toLowerCase() === (y || '').toLowerCase();
-    const i = R.experience.findIndex(x => same(x.company, j.company) && same(x.role, j.role));
+    const same = (x, y) => (x || '').trim().toLowerCase() === (y || '').trim().toLowerCase();
+    const i = R.experience.findIndex(x =>
+      (same(x.role, j.role) || !x.role || !j.role) &&
+      (same(x.company, j.company) || !x.company || !j.company) &&
+      (same(x.role, j.role) || same(x.company, j.company)));
     if (i < 0) R.experience.push({ bullets: [], ...j });
     else {
       const o = R.experience[i];
@@ -253,19 +256,22 @@ function playAudioChunk(base64Audio) {
   } catch (e) { console.error("Audio playback error:", e); }
 }
 
-async function startInterview() {
+async function startInterview(auto) {
   if (polishing) return;
   if (websocket && websocket.readyState === WebSocket.CONNECTING) {
     logMessage("Still connecting. Please wait a few seconds.");
     return;
   }
   if (websocket && websocket.readyState === WebSocket.OPEN) {
+    userEnded = true;
     websocket.close(1000, "done");
     stopSession();
     logMessage("Interview completed. Polishing summary...");
     await polishResume();
     return;
   }
+  userEnded = false;
+  if (!auto) retries = 0;
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
@@ -289,7 +295,15 @@ async function startInterview() {
         ...(USE_TOOLS ? { tools: TOOLS } : {})
       } }));
     };
-    websocket.onclose = e => { logMessage(`Session closed (code ${e.code}${e.reason ? ': ' + e.reason : ''}).`); stopSession(); };
+    websocket.onclose = e => {
+      logMessage(`Session closed (code ${e.code}${e.reason ? ': ' + e.reason : ''}).`);
+      stopSession();
+      if (!userEnded && e.code !== 1000 && retries < 3) {
+        retries++;
+        logMessage(`Reconnecting (${retries}/3)... your resume so far is kept.`);
+        setTimeout(() => startInterview(true), 1000);
+      }
+    };
     websocket.onmessage = async event => {
       try {
         const raw = typeof event.data === 'string' ? event.data : await event.data.text();
