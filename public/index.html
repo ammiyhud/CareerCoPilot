@@ -61,6 +61,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.btn-primary:foc
     <div class="orb-container"><div class="orb"></div></div>
     <button class="btn-primary" id="start-interview-btn" onclick="startInterview()">Start Voice Interview</button>
     <div class="log-box" id="interview-log" aria-live="polite">System initialized. Ready to begin.</div>
+    <button class="btn-primary" id="testBtn" style="margin-top:8px;background:#374151">Run connection test (about 30 seconds)</button>
   </div>
 
   <div class="panel">
@@ -214,6 +215,25 @@ async function addDoc(kind, file, text) {
 $('resumeFile').onchange = e => e.target.files[0] && addDoc('resume', e.target.files[0]);
 $('jobFile').onchange = e => e.target.files[0] && addDoc('job', e.target.files[0]);
 $('jobBtn').onclick = () => { const t = $('jobText').value.trim(); if (t) addDoc('job', null, t); };
+
+// ---------- Connection test (temporary) ----------
+async function runTests() {
+  const btn = $('testBtn'); btn.disabled = true;
+  const tests = ['', '?modalities=0', '?model=models/gemini-2.5-flash-native-audio-preview-12-2025', '?model=models/gemini-3.8-live'];
+  for (const t of tests) {
+    logMessage('Test ' + (t || '(default)') + ' ... wait 7 seconds');
+    try {
+      const r = await fetch('/api/Live-test' + t);
+      const txt = await r.text();
+      let d;
+      try { d = JSON.parse(txt); } catch (_) { logMessage('Not the test page (HTTP ' + r.status + '). Live-test.js may not be deployed.'); break; }
+      logMessage('Result: ' + JSON.stringify(d.events || d).slice(0, 500));
+    } catch (e) { logMessage('Test failed: ' + e.message); }
+  }
+  logMessage('Tests finished.');
+  btn.disabled = false;
+}
+$('testBtn').onclick = runTests;
 
 // ---------- Voice ----------
 function playAudioChunk(base64Audio) {
