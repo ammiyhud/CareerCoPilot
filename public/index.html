@@ -57,7 +57,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.btn-primary:foc
 
 <div class="left-column">
   <div class="panel">
-    <div class="header-bar"><span id="status">● SESSION STANDBY</span><span>Career Copilot. AI · build 8</span></div>
+    <div class="header-bar"><span id="status">● SESSION STANDBY</span><span>Career Copilot. AI · build 9</span></div>
     <div class="orb-container"><div class="orb"></div></div>
     <button class="btn-primary" id="start-interview-btn" onclick="startInterview()">Start Voice Interview</button>
     <div class="log-box" id="interview-log" aria-live="polite">System initialized. Ready to begin.</div>
@@ -188,17 +188,21 @@ function tell(text) {
 }
 
 // ---------- Documents ----------
-const b64 = file => new Promise(res => { const f = new FileReader(); f.onload = () => res(f.result.split(',')[1]); f.readAsDataURL(file); });
 async function addDoc(kind, file, text) {
   const label = kind === 'job' ? 'job description' : 'resume';
   try {
     logMessage(`Reading ${label}...`);
-    const body = { kind };
-    if (text) body.text = text;
-    else if (file.size > 4e6) return logMessage('That file is over 4 MB. Try a smaller one.');
-    else if (file.type === 'text/plain') body.text = await file.text();
-    else { body.mime = file.type; body.data = await b64(file); }
-    const r = await fetch('/api/extract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    let r;
+    if (text || (file && file.type === 'text/plain')) {
+      const t = text || await file.text();
+      r = await fetch('/api/extract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, text: t }) });
+    } else if (file.size > 4e6) {
+      return logMessage('That file is over 4 MB. Try a smaller one.');
+    } else {
+      // Send the raw file bytes with the real MIME type: no base64/JSON wrapping to truncate.
+      r = await fetch('/api/extract', { method: 'POST', body: file,
+        headers: { 'Content-Type': file.type || 'application/octet-stream', 'x-kind': kind, 'x-filename': file.name } });
+    }
     const raw = await r.text();
     let j = {};
     try { j = JSON.parse(raw); } catch (_) {}
