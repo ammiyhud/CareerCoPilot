@@ -219,7 +219,7 @@ $('jobBtn').onclick = () => { const t = $('jobText').value.trim(); if (t) addDoc
 // ---------- Connection test (temporary) ----------
 async function runTests() {
   const btn = $('testBtn'); btn.disabled = true;
-  const tests = ['', '?modalities=0', '?model=models/gemini-2.5-flash-native-audio-preview-12-2025', '?model=models/gemini-3.8-live'];
+  const tests = ['', '?via=header', '?via=ctor'];
   for (const t of tests) {
     logMessage('Test ' + (t || '(default)') + ' ... wait 7 seconds');
     try {
