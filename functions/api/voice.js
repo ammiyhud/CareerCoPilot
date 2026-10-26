@@ -14,37 +14,58 @@ function toText(data) {
     return typeof data === 'string' ? data : new TextDecoder().decode(data);
 }
 
-// Temporary diagnostic: /api/voice?test=1[&model=...][&modalities=0]
+// Temporary diagnostic: /api/voice?test=1[&via=fetch|header|ctor][&model=...]
 async function runLiveTest(request, env) {
     const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'Content-Type': 'application/json' } });
     if (!env.GEMINI_API_KEY) return json({ error: 'GEMINI_API_KEY is missing' }, 500);
 
+    const key = env.GEMINI_API_KEY;
+    const clean = (s) => String(s).split(key).join('***').slice(0, 300);
     const q = new URL(request.url).searchParams;
+    const via = q.get('via') || 'fetch';
     const model = q.get('model') || 'models/gemini-2.5-flash-native-audio-latest';
-    const setup = { model };
-    if (q.get('modalities') !== '0') setup.generationConfig = { responseModalities: ['AUDIO'] };
+    const setup = { model, generationConfig: { responseModalities: ['AUDIO'] } };
+    const base = 'https://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent';
 
     const started = Date.now();
     const events = [];
-    const up = await fetch(
-        'https://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=' +
-            env.GEMINI_API_KEY,
-        { headers: { Upgrade: 'websocket' } }
-    );
-    if (!up.webSocket) {
-        return json({ events: [{ step: 'connect', http_status: up.status, body: (await up.text()).slice(0, 300) }] });
+    const mark = (o) => events.push({ ms: Date.now() - started, ...o });
+
+    let ws;
+    try {
+        if (via === 'ctor') {
+            ws = new WebSocket(base.replace('https://', 'wss://') + '?key=' + key);
+        } else {
+            const up = await fetch(via === 'header' ? base : base + '?key=' + key, {
+                headers: via === 'header' ? { Upgrade: 'websocket', 'x-goog-api-key': key } : { Upgrade: 'websocket' }
+            });
+            mark({ http_status: up.status });
+            if (!up.webSocket) {
+                mark({ body: clean(await up.text()) });
+                return json({ via, events });
+            }
+            ws = up.webSocket;
+            ws.accept();
+        }
+    } catch (e) {
+        mark({ exception: clean(e.message || e) });
+        return json({ via, events });
     }
-    const ws = up.webSocket;
-    ws.accept();
+
     await new Promise((resolve) => {
-        ws.addEventListener('message', (e) => events.push({ ms: Date.now() - started, message: toText(e.data).slice(0, 250) }));
-        ws.addEventListener('close', (e) => { events.push({ ms: Date.now() - started, closed: { code: e.code, reason: e.reason } }); resolve(); });
-        ws.addEventListener('error', () => { events.push({ ms: Date.now() - started, error: 'socket error' }); resolve(); });
-        ws.send(JSON.stringify({ setup }));
+        ws.addEventListener('message', (e) => mark({ message: clean(toText(e.data)) }));
+        ws.addEventListener('close', (e) => { mark({ closed: { code: e.code, reason: clean(e.reason || '') } }); resolve(); });
+        ws.addEventListener('error', (e) => { mark({ error: clean(e.message || 'socket error') }); resolve(); });
+        const send = () => {
+            try { ws.send(JSON.stringify({ setup })); mark({ sent_setup: true }); }
+            catch (e) { mark({ send_failed: clean(e.message || e) }); resolve(); }
+        };
+        if (via === 'ctor') ws.addEventListener('open', () => { mark({ opened: true }); send(); });
+        else send();
         setTimeout(resolve, 7000);
     });
     try { ws.close(1000, 'test done'); } catch (_) {}
-    return json({ setup_model: model, events: events.length ? events : 'Google sent nothing in 7 seconds' });
+    return json({ via, events });
 }
 
 export async function onRequest(context) {
