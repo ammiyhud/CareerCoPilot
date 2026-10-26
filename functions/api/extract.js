@@ -3,7 +3,10 @@ export async function onRequestPost({ request, env }) {
     const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'Content-Type': 'application/json' } });
     try {
         if (!env.ANTHROPIC_API_KEY) return json({ error: 'ANTHROPIC_API_KEY is missing' }, 500);
-        const { kind, text, mime, data } = await request.json();
+        let body;
+        try { body = await request.json(); }
+        catch (_) { return json({ error: 'extract v2: the server received an empty or unreadable upload.' }, 400); }
+        const { kind, text, mime, data } = body;
 
         let doc;
         if (data && mime === 'application/pdf') doc = { type: 'document', source: { type: 'base64', media_type: mime, data } };
@@ -42,6 +45,11 @@ export async function onRequestPost({ request, env }) {
             return json({ error: `Claude's answer was cut off or malformed (stop reason: ${out.stop_reason}).` }, 502);
         }
     } catch (err) {
-        return json({ error: err.message }, 500);
+        return json({ error: 'extract v2: ' + err.message }, 500);
     }
+}
+
+// Visiting /api/extract in a browser confirms this version is live.
+export async function onRequestGet() {
+    return new Response('extract v2 is live');
 }
